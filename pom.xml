@@ -198,12 +198,13 @@
     -->
     <distributionManagement>
         <repository>
-            <id>dcache.org</id>
-            <url>https://download.dcache.org/nexus/content/repositories/releases</url>
+            <id>maven.iterate.ch-release</id>
+            <url>s3://repo.maven.iterate.ch/releases/</url>
+            <layout>default</layout>
         </repository>
         <snapshotRepository>
-            <id>dcache.org-snapshot</id>
-            <url>https://download.dcache.org/nexus/content/repositories/snapshots</url>
+            <id>maven.iterate.ch-snapshot</id>
+            <url>s3://repo.maven.iterate.ch/snapshots/</url>
         </snapshotRepository>
     </distributionManagement>
 
