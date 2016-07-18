@@ -52,6 +52,8 @@ import org.dcache.nfs.status.WrongTypeException;
 import org.dcache.nfs.v4.xdr.fattr4_size;
 import org.dcache.nfs.v4.xdr.mode4;
 import org.dcache.nfs.v4.xdr.nfs_resop4;
+import org.dcache.nfs.v4.xdr.state_owner4;
+import org.dcache.nfs.v4.xdr.stateid4;
 import org.dcache.nfs.vfs.Inode;
 import org.dcache.nfs.vfs.Stat;
 import org.dcache.xdr.OncRpcException;
@@ -74,16 +76,14 @@ public class OperationOPEN extends AbstractNFSv4Operation {
         if (context.getMinorversion() > 0) {
             client = context.getSession().getClient();
         } else {
-            Long clientid = _args.opopen.owner.clientid.value;
-            client = context.getStateHandler().getClientByID(clientid);
-
+            client = context.getStateHandler().getClientByID(_args.opopen.owner.clientid);
             if (client == null || !client.isConfirmed()) {
                 throw new StaleClientidException("bad client id.");
             }
 
             client.validateSequence(_args.opopen.seqid);
             client.updateLeaseTime();
-            _log.debug("open request form {}", _args.opopen.owner);
+            _log.debug("open request form {} ", _args.opopen.owner);
         }
 
         res.resok4 = new OPEN4resok();
@@ -251,12 +251,26 @@ public class OperationOPEN extends AbstractNFSv4Operation {
                     | nfs4_prot.OPEN4_RESULT_CONFIRM);
         }
 
-        NFS4State nfs4state = client.createState();
-        context.currentStateid(nfs4state.stateid());
-        res.resok4.stateid = nfs4state.stateid();
+        /*
+         * NOTICE:
+         * in case on concurrent non-exclusive created with share_deny == WRITE
+         * may happen that client which have created the file will get DENY.
+         *
+         * THis is a perfectly a valid situation as at the end file is created and only
+         * one writer is allowed.
+         */
 
-        _log.debug("New stateID: {}", nfs4state.stateid());
+        state_owner4 owner = context.getMinorversion() == 0
+                ?_args.opopen.owner : client.asStateOwner();
+        stateid4 stateid = context
+                .getStateHandler()
+                .getFileTracker()
+                .addOpen(client, owner, context.currentInode(),
+                _args.opopen.share_access.value,
+                _args.opopen.share_deny.value);
 
+        context.currentStateid(stateid);
+        res.resok4.stateid = stateid;
         res.status = nfsstat.NFS_OK;
 
     }

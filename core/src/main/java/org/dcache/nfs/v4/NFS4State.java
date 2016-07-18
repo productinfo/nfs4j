@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2015 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2016 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -21,6 +21,7 @@ package org.dcache.nfs.v4;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.dcache.nfs.v4.xdr.state_owner4;
 import org.dcache.nfs.v4.xdr.stateid4;
 
 public class NFS4State {
@@ -42,21 +43,29 @@ public class NFS4State {
      */
 
     private final stateid4 _stateid;
+    private final state_owner4 _owner;
     private boolean _isConfimed = false;
     private boolean _disposed = false;
+    private final NFS4State _parentState;
 
     private final List<StateDisposeListener> _disposeListeners;
 
-    public NFS4State(stateid4 stateid) {
+    public NFS4State(state_owner4 owner, stateid4 stateid) {
+        this(null, owner, stateid);
+    }
+
+    public NFS4State(NFS4State parentState, state_owner4 owner, stateid4 stateid) {
+        _parentState = parentState;
+        _owner = owner;
         _stateid = stateid;
         _disposeListeners = new ArrayList<>();
     }
 
-    public NFS4State(byte[] other, int seqid) {
-        this(new stateid4(other, seqid));
-    }
-
     public void bumpSeqid() { ++ _stateid.seqid.value; }
+
+    public state_owner4 getStateOwner() {
+        return _owner;
+    }
 
     public stateid4 stateid() {
         return _stateid;
@@ -80,6 +89,10 @@ public class NFS4State {
             _disposeListeners.forEach(l -> l.notifyDisposed(this));
             _disposed = true;
         }
+    }
+
+    public NFS4State getParentState() {
+        return _parentState == null? this : _parentState;
     }
 
     /**
