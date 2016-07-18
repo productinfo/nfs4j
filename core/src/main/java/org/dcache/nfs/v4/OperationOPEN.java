@@ -162,7 +162,7 @@ public class OperationOPEN extends AbstractNFSv4Operation {
                     } catch (ExistException e) {
 
                         if (exclusive) {
-                            throw new ExistException();
+                            throw e;
                         }
                         // no changes from us, old stat info is still good enough
                         res.resok4.cinfo.after = new changeid4(stat.getCTime());
