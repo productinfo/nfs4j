@@ -262,13 +262,13 @@ public class NFS4Client {
     public synchronized void updateLeaseTime() throws ChimeraNFSException {
 
         long curentTime = System.currentTimeMillis();
+        _cl_time = curentTime;
         long delta = curentTime - _cl_time;
         if (delta > _leaseTime) {
             _clientStates.clear();
             throw new ExpiredException("lease time expired: (" + delta +"): " + Bytes.toHexString(_ownerId) +
                     " (" + _clientId + ").");
         }
-        _cl_time = curentTime;
     }
 
     /**
