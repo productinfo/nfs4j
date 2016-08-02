@@ -53,10 +53,6 @@ public class OperationWRITE extends AbstractNFSv4Operation {
 
         final WRITE4res res = result.opwrite;
 
-        if (_args.opwrite.offset.value + _args.opwrite.data.remaining() > 0x3ffffffe) {
-            throw new InvalException("Arbitrary value");
-        }
-
         Stat stat = context.getFs().getattr(context.currentInode());
 
         if (stat.type() == Stat.Type.DIRECTORY) {
