@@ -16,8 +16,8 @@
     <url>http://www.dCache.ORG</url>
 
     <scm>
-        <connection>scm:git:https://github.com/dCache/nfs4j.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com/dCache/nfs4j.git</developerConnection>
+        <connection>scm:git:https://github.com/iterate-ch/nfs4j.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/iterate-ch/nfs4j.git</developerConnection>
         <tag>HEAD</tag>
     </scm>
 
