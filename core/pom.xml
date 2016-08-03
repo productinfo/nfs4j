@@ -3,12 +3,11 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-      <groupId>org.dcache</groupId>
+      <groupId>ch.iterate</groupId>
       <artifactId>nfs4j</artifactId>
       <version>0.13.0-SNAPSHOT</version>
     </parent>
 
-    <groupId>org.dcache</groupId>
     <artifactId>nfs4j-core</artifactId>
     <packaging>jar</packaging>
 
