@@ -92,8 +92,7 @@ public class OperationLAYOUTGET extends AbstractNFSv4Operation {
         int shareAccess = context
                 .getStateHandler()
                 .getFileTracker()
-                .getShareAccess(context.getSession().getClient(), inode,
-                        state.getParentState().stateid());
+                .getShareAccess(context.getSession().getClient(), inode, state.getOpenState().stateid());
 
         if ((shareAccess & nfs4_prot.OPEN4_SHARE_ACCESS_WRITE) == 0 &&
                 (ioMode & layoutiomode4.LAYOUTIOMODE4_RW) != 0) {

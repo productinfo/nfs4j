@@ -96,7 +96,7 @@ public class OperationSETATTR extends AbstractNFSv4Operation {
 
             // setting file size requires open for writing
             int shareAccess = context.getStateHandler().getFileTracker().getShareAccess(client, inode,
-                    state.getParentState().stateid());
+                    state.getOpenState().stateid());
             if ((shareAccess & nfs4_prot.OPEN4_SHARE_ACCESS_WRITE) == 0) {
                 throw new OpenModeException("Invalid open mode");
             }

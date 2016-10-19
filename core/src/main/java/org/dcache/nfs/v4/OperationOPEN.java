@@ -76,14 +76,16 @@ public class OperationOPEN extends AbstractNFSv4Operation {
         if (context.getMinorversion() > 0) {
             client = context.getSession().getClient();
         } else {
-            client = context.getStateHandler().getClientByID(_args.opopen.owner.clientid);
+            Long clientid = _args.opopen.owner.clientid.value;
+            client = context.getStateHandler().getClientByID(clientid);
+
             if (client == null || !client.isConfirmed()) {
                 throw new StaleClientidException("bad client id.");
             }
 
             client.validateSequence(_args.opopen.seqid);
             client.updateLeaseTime();
-            _log.debug("open request form {} ", _args.opopen.owner);
+            _log.debug("open request form {}", _args.opopen.owner);
         }
 
         res.resok4 = new OPEN4resok();
@@ -162,7 +164,7 @@ public class OperationOPEN extends AbstractNFSv4Operation {
                     } catch (ExistException e) {
 
                         if (exclusive) {
-                            throw e;
+                            throw new ExistException();
                         }
                         // no changes from us, old stat info is still good enough
                         res.resok4.cinfo.after = new changeid4(stat.getCTime());
@@ -259,7 +261,6 @@ public class OperationOPEN extends AbstractNFSv4Operation {
          * THis is a perfectly a valid situation as at the end file is created and only
          * one writer is allowed.
          */
-
         state_owner4 owner = context.getMinorversion() == 0
                 ?_args.opopen.owner : client.asStateOwner();
         stateid4 stateid = context

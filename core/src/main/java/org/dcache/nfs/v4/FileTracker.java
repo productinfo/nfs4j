@@ -19,11 +19,15 @@
  */
 package org.dcache.nfs.v4;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.Striped;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashMap;
+import java.util.concurrent.locks.Lock;
 import org.dcache.nfs.ChimeraNFSException;
 import org.dcache.nfs.status.BadStateidException;
 import org.dcache.nfs.status.InvalException;
@@ -38,7 +42,18 @@ import org.dcache.utils.Opaque;
  */
 public class FileTracker {
 
-    private final Map<Opaque, List<OpenState>> files = new ConcurrentHashMap<>();
+    /*
+     * we use {@link Striped} locks here to split synchronized block on open files
+     * into multiple partitions to increase concurrency, while guaranteeing atomicity
+     * on a single file.
+     *
+     * we use number of stripes equals to 4x#CPU. This matches to number of
+     * worker threads configured by default.
+     *
+     * FIXME: get number of threads from RPC service.
+     */
+    private final Striped<Lock> filesLock = Striped.lock(Runtime.getRuntime().availableProcessors()*4);
+    private final Map<Opaque, List<OpenState>> files = Collections.synchronizedMap(new HashMap<>());
 
     private static class OpenState {
 
@@ -90,21 +105,21 @@ public class FileTracker {
     public stateid4 addOpen(NFS4Client client, state_owner4 owner, Inode inode, int shareAccess, int shareDeny) throws  ChimeraNFSException {
 
         Opaque fileId = new Opaque(inode.getFileId());
-        // check for existing opens on that file
-        final List<OpenState> opens = files.computeIfAbsent(fileId,
-                x -> {
-                    return new ArrayList<>();
-                });
+        Lock lock = filesLock.get(fileId);
+        lock.lock();
+        try {
+            /*
+             * check for existing opens on that file
+             * initialize new array with size of one, as this is what the majority of cases will be
+             */
+            final List<OpenState> opens = files.computeIfAbsent(fileId, x -> new ArrayList<>(1));
 
-        stateid4 stateid;
-        synchronized (opens) {
+            stateid4 stateid;
             // check for conflickting open from not expired client (we need to check
             // client as session GC may not beed active yet
             if (opens.stream()
                     .filter(o -> o.client.isLeaseValid())
-                    .filter(o -> (shareAccess & o.getShareDeny()) != 0|| (shareDeny & o.getShareAccess()) != 0)
-                    .findAny()
-                    .isPresent()) {
+                    .anyMatch(o -> (shareAccess & o.getShareDeny()) != 0|| (shareDeny & o.getShareAccess()) != 0)) {
                     throw new ShareDeniedException("Conflicting share");
             }
 
@@ -125,17 +140,10 @@ public class FileTracker {
             stateid = state.stateid();
             OpenState openState = new OpenState(client, owner, stateid, shareAccess, shareDeny);
             opens.add(openState);
-            if(opens.size() == 1) {
-                /*
-                 * this is the the only entry. EEither this is the first open
-                 * on that file or or concurrent open have removed the last entry
-                 * while we was waiting for synchronized block. In this case, the
-                 * list is removed from the hashmap.
-                 */
-                files.putIfAbsent(fileId, opens);
-            }
-            state.addDisposeListener(s -> {removeOpen(inode, stateid);} );
+            state.addDisposeListener(s -> removeOpen(inode, stateid));
             return stateid;
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -153,21 +161,23 @@ public class FileTracker {
     public stateid4 downgradeOpen(NFS4Client client, stateid4 stateid, Inode inode, int shareAccess, int shareDeny) throws ChimeraNFSException {
 
         Opaque fileId = new Opaque(inode.getFileId());
-        final List<OpenState> opens = files.get(fileId);
+        Lock lock = filesLock.get(fileId);
+        lock.lock();
+        try {
+            final List<OpenState> opens = files.get(fileId);
 
-        synchronized (opens) {
             OpenState os = opens.stream()
-                    .filter(s -> client.getId().value == s.client.getId().value)
+                    .filter(s -> client.getId() == s.client.getId())
                     .filter(s -> s.stateid.equals(stateid))
                     .findFirst()
                     .orElseThrow(BadStateidException::new);
 
-            if (shareAccess != 0 && (os.shareAccess & shareAccess) == 0) {
+            if ((os.shareAccess & shareAccess) != shareAccess) {
                 throw new InvalException("downgrading to not owned share_access mode");
             }
 
-            if (shareDeny != 0 && (os.shareDeny & shareDeny) == 0) {
-                throw new InvalException("downgrading to not share_owned deny mode");
+            if ((os.shareDeny & shareDeny) != shareDeny) {
+                throw new InvalException("downgrading to not owned share_deny mode");
             }
 
             os.shareAccess = shareAccess;
@@ -175,40 +185,43 @@ public class FileTracker {
 
             os.stateid.seqid.value++;
             return os.stateid;
+        } finally {
+            lock.unlock();
         }
     }
 
     /**
-     * Utility method to remove an open from the list.
+     * Remove an open from the list.
      * @param inode of the opened file
      * @param stateid associated with the open.
      */
-    private void removeOpen(Inode inode, stateid4 stateid) {
+    void removeOpen(Inode inode, stateid4 stateid) {
 
         Opaque fileId = new Opaque(inode.getFileId());
-        final List<OpenState> opens = files.get(fileId);
+        Lock lock = filesLock.get(fileId);
+        lock.lock();
+        try {
+            final List<OpenState> opens = files.get(fileId);
 
-        if (opens != null) {
-            synchronized (opens) {
-
-                Iterator<OpenState> osi = opens.listIterator();
+            if (opens != null) {
+                Iterator<OpenState> osi = opens.iterator();
                 while(osi.hasNext()) {
                     OpenState os = osi.next();
                     if (os.stateid.equals(stateid)) {
                         osi.remove();
-                        return;
+                        break;
                     }
                 }
 
                 /**
                  * As we hold the lock, nobody else have added something into it.
-                 * A concurrent open request may be still waiting for a lock, but
-                 * it have to detect removal and add into hashmap back.
                  */
                 if (opens.isEmpty()) {
                     files.remove(fileId);
                 }
             }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -223,19 +236,23 @@ public class FileTracker {
     public int getShareAccess(NFS4Client client, Inode inode, stateid4 stateid) throws BadStateidException {
 
         Opaque fileId = new Opaque(inode.getFileId());
+        Lock lock = filesLock.get(fileId);
+        lock.lock();
+        try {
+            final List<OpenState> opens = files.get(fileId);
 
-        final List<OpenState> opens = files.get(fileId);
-
-        if (opens != null) {
-            synchronized (opens) {
-                return opens.stream()
-                        .filter(s -> client.getId().value == s.client.getId().value)
-                        .filter(s -> s.stateid.equals(stateid))
-                        .map(OpenState::getShareAccess)
-                        .findFirst()
-                        .orElseThrow(BadStateidException::new);
+            if (opens == null) {
+                throw new BadStateidException("no matching open");
             }
+
+            return opens.stream()
+                    .filter(s -> client.getId() == s.client.getId())
+                    .filter(s -> s.stateid.equals(stateid))
+                    .map(OpenState::getShareAccess)
+                    .findFirst()
+                    .orElseThrow(BadStateidException::new);
+        } finally {
+            lock.unlock();
         }
-        throw new BadStateidException("no matching open");
     }
 }

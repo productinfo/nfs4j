@@ -19,27 +19,29 @@
  */
 package org.dcache.nfs.v4;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.net.InetSocketAddress;
 import java.security.Principal;
-import org.dcache.nfs.v4.xdr.clientid4;
-import org.dcache.nfs.v4.xdr.stateid4;
-import org.dcache.nfs.ChimeraNFSException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import org.dcache.nfs.ChimeraNFSException;
 import org.dcache.nfs.status.BadSessionException;
 import org.dcache.nfs.status.BadStateidException;
 import org.dcache.nfs.status.StaleClientidException;
 import org.dcache.nfs.v4.xdr.sessionid4;
+import org.dcache.nfs.v4.xdr.stateid4;
 import org.dcache.nfs.v4.xdr.verifier4;
-import org.dcache.utils.Cache;
 import org.dcache.utils.Bytes;
+import org.dcache.utils.Cache;
 import org.dcache.utils.NopCacheEventListener;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Preconditions.checkState;
 
@@ -92,7 +94,7 @@ public class NFSv4StateHandler {
 	    checkState(_running, "NFS state handler not running");
 
             client.sessions().forEach(s -> _sessionById.remove(s.id()));
-	    _clientsByServerId.remove(client.getId().value);
+	    _clientsByServerId.remove(client.getId());
 	}
         client.tryDispose();
     }
@@ -100,14 +102,14 @@ public class NFSv4StateHandler {
     private synchronized void addClient(NFS4Client newClient) {
 
         checkState(_running, "NFS state handler not running");
-        _clientsByServerId.put(newClient.getId().value, newClient);
+        _clientsByServerId.put(newClient.getId(), newClient);
     }
 
-    public synchronized NFS4Client getClientByID(clientid4 clientid) throws ChimeraNFSException {
+    public synchronized NFS4Client getClientByID( Long id) throws ChimeraNFSException {
 
         checkState(_running, "NFS state handler not running");
 
-        NFS4Client client = _clientsByServerId.get(clientid.value);
+        NFS4Client client = _clientsByServerId.get(id);
         if(client == null) {
             throw new StaleClientidException("bad client id.");
         }
@@ -165,7 +167,7 @@ public class NFSv4StateHandler {
         NFS4State state = client.state(stateid);
 
         if( !state.isConfimed() ) {
-            _log.warn("State is not confirmed"  );
+            throw new BadStateidException("State is not confirmed"  );
         }
 
         Stateids.checkStateId(state.stateid(), stateid);
@@ -233,12 +235,25 @@ public class NFSv4StateHandler {
 	return true;
     }
 
+    private synchronized void drainClients() {
+        Iterator<NFS4Client> i = _clientsByServerId.values().iterator();
+        while (i.hasNext()) {
+            NFS4Client client = i.next();
+            client.sessions().stream()
+                    .map(NFSv41Session::id)
+                    .forEach(_sessionById::remove);
+            client.tryDispose();
+            i.remove();
+        }
+    }
+
     /**
      * Shutdown session lease time watchdog thread.
      */
     public synchronized void shutdown() {
         checkState(_running, "NFS state handler not running");
         _running = false;
+        drainClients();
         _sessionById.shutdown();
     }
 
@@ -269,8 +284,8 @@ public class NFSv4StateHandler {
      * This schema allows us to have 2^16 unique client per second and
      * 2^16 instances of state handler.
      */
-    private clientid4 nextClientId() {
+    private long nextClientId() {
         long now = (System.currentTimeMillis() / 1000);
-        return new clientid4((now << 32) | (_instanceId << 16) | (_clientId.incrementAndGet() & 0x0000FFFF));
+        return (now << 32) | (_instanceId << 16) | (_clientId.incrementAndGet() & 0x0000FFFF);
     }
 }

@@ -19,12 +19,18 @@
  */
 package org.dcache.nfs.v4;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.List;
+
 import org.dcache.nfs.v4.xdr.state_owner4;
 import org.dcache.nfs.v4.xdr.stateid4;
 
 public class NFS4State {
+
+    private static final Logger LOG = LoggerFactory.getLogger(NFS4State.class);
 
     /*
         struct stateid4 {
@@ -46,7 +52,12 @@ public class NFS4State {
     private final state_owner4 _owner;
     private boolean _isConfimed = false;
     private boolean _disposed = false;
-    private final NFS4State _parentState;
+
+    /**
+     * A state (lock, layout)) can be derived from an open state.
+     * If null, then this is the original open state.
+     */ 
+    private final NFS4State _openState;
 
     private final List<StateDisposeListener> _disposeListeners;
 
@@ -54,18 +65,14 @@ public class NFS4State {
         this(null, owner, stateid);
     }
 
-    public NFS4State(NFS4State parentState, state_owner4 owner, stateid4 stateid) {
-        _parentState = parentState;
+    public NFS4State(NFS4State openState, state_owner4 owner, stateid4 stateid) {
+        _openState = openState;
         _owner = owner;
         _stateid = stateid;
         _disposeListeners = new ArrayList<>();
     }
 
     public void bumpSeqid() { ++ _stateid.seqid.value; }
-
-    public state_owner4 getStateOwner() {
-        return _owner;
-    }
 
     public stateid4 stateid() {
         return _stateid;
@@ -86,13 +93,21 @@ public class NFS4State {
     synchronized public final void tryDispose() {
         if (!_disposed) {
             dispose();
-            _disposeListeners.forEach(l -> l.notifyDisposed(this));
+            _disposeListeners.forEach(this::tryNotifyDisposal);
             _disposed = true;
         }
     }
 
-    public NFS4State getParentState() {
-        return _parentState == null? this : _parentState;
+    private void tryNotifyDisposal(StateDisposeListener listener) {
+        try {
+            listener.notifyDisposed(this);
+        } catch (RuntimeException e) {
+            LOG.error("Bug detected notifying {}", listener, e);
+        }
+    }
+
+    public NFS4State getOpenState() {
+        return _openState == null? this : _openState;
     }
 
     /**

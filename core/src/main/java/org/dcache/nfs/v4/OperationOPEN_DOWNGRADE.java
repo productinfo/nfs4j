@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2012 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2016 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -21,7 +21,6 @@ package org.dcache.nfs.v4;
 
 import org.dcache.nfs.ChimeraNFSException;
 import org.dcache.nfs.nfsstat;
-import org.dcache.nfs.status.BadSeqidException;
 import org.dcache.nfs.status.InvalException;
 import org.dcache.nfs.v4.xdr.OPEN_DOWNGRADE4res;
 import org.dcache.nfs.v4.xdr.OPEN_DOWNGRADE4resok;
@@ -50,11 +49,20 @@ public class OperationOPEN_DOWNGRADE extends AbstractNFSv4Operation {
         final int shareAccess = _args.opopen_downgrade.share_access.value & ~nfs4_prot.OPEN4_SHARE_ACCESS_WANT_DELEG_MASK;
         final int shareDeny = _args.opopen_downgrade.share_deny.value & ~nfs4_prot.OPEN4_SHARE_ACCESS_WANT_DELEG_MASK;
 
+        /*
+         * Share access must be one of OPEN4_SHARE_ACCESS_READ, OPEN4_SHARE_ACCESS_WRITE
+         * or OPEN4_SHARE_ACCESS_BOTH. Share deny can be zero or one of
+         * OPEN4_SHARE_DENY_READ, OPEN4_SHARE_DENY_WRITE or OPEN4_SHARE_DENY_BOTH.
+         */
+        if ((shareAccess & nfs4_prot.OPEN4_SHARE_ACCESS_BOTH) == 0) {
+            throw new InvalException("Invalid share access mode");
+        }
+
         if ((shareAccess & ~nfs4_prot.OPEN4_SHARE_ACCESS_BOTH) != 0) {
             throw new InvalException("Invalid share access mode");
         }
 
-        if ((shareDeny & ~nfs4_prot.OPEN4_SHARE_ACCESS_BOTH) != 0) {
+        if ((shareDeny & ~nfs4_prot.OPEN4_SHARE_DENY_BOTH) != 0) {
             throw new InvalException("Invalid share deny mode");
         }
 
