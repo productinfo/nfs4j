@@ -22,21 +22,8 @@ package org.dcache.nfs.v4;
 import java.io.IOException;
 import java.util.Optional;
 
-import org.dcache.nfs.v4.xdr.open_delegation_type4;
-import org.dcache.nfs.v4.xdr.change_info4;
-import org.dcache.nfs.v4.xdr.bitmap4;
-import org.dcache.nfs.v4.xdr.nfs4_prot;
-import org.dcache.nfs.v4.xdr.nfs_argop4;
-import org.dcache.nfs.v4.xdr.changeid4;
+import org.dcache.nfs.v4.xdr.*;
 import org.dcache.nfs.nfsstat;
-import org.dcache.nfs.v4.xdr.uint32_t;
-import org.dcache.nfs.v4.xdr.opentype4;
-import org.dcache.nfs.v4.xdr.open_claim_type4;
-import org.dcache.nfs.v4.xdr.open_delegation4;
-import org.dcache.nfs.v4.xdr.createmode4;
-import org.dcache.nfs.v4.xdr.nfs_opnum4;
-import org.dcache.nfs.v4.xdr.OPEN4resok;
-import org.dcache.nfs.v4.xdr.OPEN4res;
 import org.dcache.nfs.ChimeraNFSException;
 import org.dcache.nfs.status.AccessException;
 import org.dcache.nfs.status.BadXdrException;
@@ -49,11 +36,6 @@ import org.dcache.nfs.status.NoGraceException;
 import org.dcache.nfs.status.StaleClientidException;
 import org.dcache.nfs.status.SymlinkException;
 import org.dcache.nfs.status.WrongTypeException;
-import org.dcache.nfs.v4.xdr.fattr4_size;
-import org.dcache.nfs.v4.xdr.mode4;
-import org.dcache.nfs.v4.xdr.nfs_resop4;
-import org.dcache.nfs.v4.xdr.state_owner4;
-import org.dcache.nfs.v4.xdr.stateid4;
 import org.dcache.nfs.vfs.Inode;
 import org.dcache.nfs.vfs.Stat;
 import org.dcache.xdr.OncRpcException;
@@ -76,7 +58,7 @@ public class OperationOPEN extends AbstractNFSv4Operation {
         if (context.getMinorversion() > 0) {
             client = context.getSession().getClient();
         } else {
-            Long clientid = _args.opopen.owner.clientid.value;
+            clientid4 clientid = _args.opopen.owner.clientid;
             client = context.getStateHandler().getClientByID(clientid);
 
             if (client == null || !client.isConfirmed()) {

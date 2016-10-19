@@ -98,7 +98,7 @@ public class OperationLOCK extends AbstractNFSv4Operation {
                     .getStateHandler()
                     .getFileTracker()
                     .getShareAccess(client, inode,
-                            openState.getParentState().stateid());
+                            openState.getOpenState().stateid());
 
             if ( (shareAccess & nfs4_prot.OPEN4_SHARE_ACCESS_WRITE) == 0 &&
                 ((_args.oplock.locktype == nfs_lock_type4.WRITEW_LT) || (_args.oplock.locktype == nfs_lock_type4.WRITE_LT))) {

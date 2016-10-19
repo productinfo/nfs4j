@@ -24,6 +24,9 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.security.Principal;
+import org.dcache.nfs.v4.xdr.clientid4;
+import org.dcache.nfs.v4.xdr.stateid4;
+import org.dcache.nfs.ChimeraNFSException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -94,7 +97,7 @@ public class NFSv4StateHandler {
 	    checkState(_running, "NFS state handler not running");
 
             client.sessions().forEach(s -> _sessionById.remove(s.id()));
-	    _clientsByServerId.remove(client.getId());
+	    _clientsByServerId.remove(client.getId().value);
 	}
         client.tryDispose();
     }
@@ -102,14 +105,14 @@ public class NFSv4StateHandler {
     private synchronized void addClient(NFS4Client newClient) {
 
         checkState(_running, "NFS state handler not running");
-        _clientsByServerId.put(newClient.getId(), newClient);
+        _clientsByServerId.put(newClient.getId().value, newClient);
     }
 
-    public synchronized NFS4Client getClientByID( Long id) throws ChimeraNFSException {
+    public synchronized NFS4Client getClientByID(clientid4 clientid) throws ChimeraNFSException {
 
         checkState(_running, "NFS state handler not running");
 
-        NFS4Client client = _clientsByServerId.get(id);
+        NFS4Client client = _clientsByServerId.get(clientid.value);
         if(client == null) {
             throw new StaleClientidException("bad client id.");
         }
@@ -284,8 +287,8 @@ public class NFSv4StateHandler {
      * This schema allows us to have 2^16 unique client per second and
      * 2^16 instances of state handler.
      */
-    private long nextClientId() {
+    private clientid4 nextClientId() {
         long now = (System.currentTimeMillis() / 1000);
-        return (now << 32) | (_instanceId << 16) | (_clientId.incrementAndGet() & 0x0000FFFF);
+        return new clientid4((now << 32) | (_instanceId << 16) | (_clientId.incrementAndGet() & 0x0000FFFF));
     }
 }
