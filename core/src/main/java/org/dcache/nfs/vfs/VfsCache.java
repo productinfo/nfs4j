@@ -91,8 +91,8 @@ public class VfsCache extends ForwardingFileSystem {
     }
 
     @Override
-    public Inode symlink(Inode parent, String path, String link, Subject subject, int mode) throws IOException {
-        Inode inode = _inner.symlink(parent, path, link, subject, mode);
+    public Inode symlink(Inode parent, String path, String link, int mode) throws IOException {
+        Inode inode = _inner.symlink(parent, path, link, mode);
 	invalidateStatCache(parent);
 	return inode;
     }
@@ -125,16 +125,16 @@ public class VfsCache extends ForwardingFileSystem {
     }
 
     @Override
-    public Inode mkdir(Inode parent, String path, Subject subject, int mode) throws IOException {
-        Inode inode = _inner.mkdir(parent, path, subject, mode);
+    public Inode mkdir(Inode parent, String path, int mode) throws IOException {
+        Inode inode = _inner.mkdir(parent, path, mode);
         updateLookupCache(parent, path, inode);
 	invalidateStatCache(parent);
         return inode;
     }
 
     @Override
-    public Inode link(Inode parent, Inode link, String path, Subject subject) throws IOException {
-        Inode inode = _inner.link(parent, link, path, subject);
+    public Inode link(Inode parent, Inode link, String path) throws IOException {
+        Inode inode = _inner.link(parent, link, path);
         updateLookupCache(parent, path, inode);
 	invalidateStatCache(parent);
 	invalidateStatCache(inode);
@@ -152,8 +152,8 @@ public class VfsCache extends ForwardingFileSystem {
     }
 
     @Override
-    public Inode create(Inode parent, Stat.Type type, String path, Subject subject, int mode) throws IOException {
-        Inode inode = _inner.create(parent, type, path, subject, mode);
+    public Inode create(Inode parent, Stat.Type type, String path, int mode) throws IOException {
+        Inode inode = _inner.create(parent, type, path, mode);
         updateLookupCache(parent, path, inode);
 	invalidateStatCache(parent);
         updateParentCache(inode, parent);
@@ -192,8 +192,7 @@ public class VfsCache extends ForwardingFileSystem {
     /**
      * Discards cached {@link Stat} value for given {@link Inode}.
      *
-     * @param parent inode
-     * @param path to invalidate
+     * @param inode inode
      */
     public void invalidateStatCache(final Inode inode) {
 	_statCache.invalidate(new Opaque(inode.getFileId()));

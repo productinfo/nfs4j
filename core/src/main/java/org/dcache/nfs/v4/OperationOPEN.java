@@ -157,7 +157,7 @@ public class OperationOPEN extends AbstractNFSv4Operation {
 
                         _log.debug("Creating a new file: {}", name);
                         inode = context.getFs().create(context.currentInode(), Stat.Type.REGULAR,
-                                name, context.getSubject(), mode);
+                                name, mode);
 
                         res.resok4.cinfo.after = new changeid4(System.currentTimeMillis());
                     } catch (ExistException e) {
