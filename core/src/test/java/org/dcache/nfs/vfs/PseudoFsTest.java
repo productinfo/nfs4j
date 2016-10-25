@@ -99,11 +99,11 @@ public class PseudoFsTest {
         given(mockedExportFile.exportsFor(localAddress.getAddress())).willReturn(Stream.of(mockedExport));
 
 
-        given(mockedFs.create(inode, Stat.Type.REGULAR, "aFile", Subjects.ROOT, 644))
+        given(mockedFs.create(inode, Stat.Type.REGULAR, "aFile", 644))
                 .willReturn( mock(Inode.class));
 
         pseudoFs = new PseudoFs(mockedFs, mockedRpc, mockedExportFile);
-        pseudoFs.create(inode, Stat.Type.REGULAR, "aFile", Subjects.ROOT, 644);
+        pseudoFs.create(inode, Stat.Type.REGULAR, "aFile", 644);
     }
 
     @Test
@@ -122,11 +122,11 @@ public class PseudoFsTest {
         given(mockedExportFile.getExport(1, localAddress.getAddress())).willReturn(mockedExport);
         given(mockedExportFile.exportsFor(localAddress.getAddress())).willReturn(Stream.of(mockedExport));
 
-        given(mockedFs.create(inode, Stat.Type.REGULAR, "aFile", Subjects.ROOT, 644))
+        given(mockedFs.create(inode, Stat.Type.REGULAR, "aFile", 644))
                 .willReturn(mock(Inode.class));
 
         pseudoFs = new PseudoFs(mockedFs, mockedRpc, mockedExportFile);
-        pseudoFs.create(inode, Stat.Type.REGULAR, "aFile", Subjects.ROOT, 644);
+        pseudoFs.create(inode, Stat.Type.REGULAR, "aFile", 644);
     }
 
     @Test(expected = AccessException.class)
@@ -146,11 +146,11 @@ public class PseudoFsTest {
         given(mockedExportFile.getExport(1, localAddress.getAddress())).willReturn(mockedExport);
         given(mockedExportFile.exportsFor(localAddress.getAddress())).willReturn(Stream.of(mockedExport));
 
-        given(mockedFs.create(inode, Stat.Type.REGULAR, "aFile", Subjects.ROOT, 644))
+        given(mockedFs.create(inode, Stat.Type.REGULAR, "aFile", 644))
                 .willReturn(mock(Inode.class));
 
         pseudoFs = new PseudoFs(mockedFs, mockedRpc, mockedExportFile);
-        pseudoFs.create(inode, Stat.Type.REGULAR, "aFile", Subjects.ROOT, 644);
+        pseudoFs.create(inode, Stat.Type.REGULAR, "aFile", 644);
     }
 
     @Test(expected = PermException.class)

@@ -323,7 +323,7 @@ public class NfsServerV3 extends nfs3_protServerStub {
                     actualSubject = Subjects.of(newAttr.uid.uid.value.value, newAttr.gid.gid.value.value);
                 }
             }
-            inode = fs.create(parent, Stat.Type.REGULAR, path, actualSubject, fmode);
+            inode = fs.create(parent, Stat.Type.REGULAR, path, fmode);
             Stat inodeStat = fs.getattr(inode);
 
 
@@ -511,7 +511,7 @@ public class NfsServerV3 extends nfs3_protServerStub {
             Inode hlink = new Inode(arg1.file.data);
 
             Stat parentStat = fs.getattr(parent);
-            fs.link(parent, hlink, name, call$.getCredential().getSubject());
+            fs.link(parent, hlink, name);
 
             res.resok = new LINK3resok();
             res.resok.file_attributes = new post_op_attr();
@@ -624,7 +624,7 @@ public class NfsServerV3 extends nfs3_protServerStub {
                 }
             }
 
-            Inode inode = fs.mkdir(parent, name, actualSubject, mode);
+            Inode inode = fs.mkdir(parent, name, mode);
 
             res.resok = new MKDIR3resok();
             res.resok.obj = new post_op_fh3();
@@ -1323,7 +1323,7 @@ public class NfsServerV3 extends nfs3_protServerStub {
             sattr3 linkAttr = arg1.symlink.symlink_attributes;
 
             Stat parentStat = fs.getattr(parent);
-            Inode inode = fs.symlink(parent, file, link, call$.getCredential().getSubject(), 777);
+            Inode inode = fs.symlink(parent, file, link, 777);
 
             HimeraNfsUtils.set_sattr(inode, fs, linkAttr);
 
