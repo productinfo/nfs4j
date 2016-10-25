@@ -170,7 +170,7 @@ public class NFSv4StateHandler {
         NFS4State state = client.state(stateid);
 
         if( !state.isConfimed() ) {
-            throw new BadStateidException("State is not confirmed"  );
+            _log.warn("State is not confirmed");
         }
 
         Stateids.checkStateId(state.stateid(), stateid);
