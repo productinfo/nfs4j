@@ -58,8 +58,8 @@ public class OperationLINK extends AbstractNFSv4Operation {
             throw new IsDirException("Can't hard-link a directory");
         }
 
-        context.getFs().link(context.currentInode(), context.savedInode(), newName,
-                context.getSubject());
+        context.getFs().link(context.currentInode(), context.savedInode(), newName
+        );
 
         result.oplink.resok4 = new LINK4resok();
         result.oplink.resok4.cinfo = new change_info4();

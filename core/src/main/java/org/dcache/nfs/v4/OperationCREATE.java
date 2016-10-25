@@ -83,28 +83,28 @@ public class OperationCREATE extends AbstractNFSv4Operation {
 
             case nfs_ftype4.NF4DIR:
                 inode = context.getFs().mkdir(context.currentInode(), name,
-                        context.getSubject(), mode);
+                        mode);
                 break;
             case nfs_ftype4.NF4LNK:
                 String linkDest = NameFilter.convertPath(_args.opcreate.objtype.linkdata.value.value);
                 inode = context.getFs().symlink(context.currentInode(), name, linkDest,
-                        context.getSubject(), mode);
+                        mode);
                 break;
             case nfs_ftype4.NF4BLK:
                 inode = context.getFs().create(context.currentInode(), Stat.Type.BLOCK, name,
-                        context.getSubject(), mode);
+                        mode);
                 break;
             case nfs_ftype4.NF4CHR:
                 inode = context.getFs().create(context.currentInode(), Stat.Type.CHAR, name,
-                        context.getSubject(), mode);
+                        mode);
                 break;
             case nfs_ftype4.NF4FIFO:
                 inode = context.getFs().create(context.currentInode(), Stat.Type.FIFO, name,
-                        context.getSubject(), mode);
+                        mode);
                 break;
             case nfs_ftype4.NF4SOCK:
                 inode = context.getFs().create(context.currentInode(), Stat.Type.SOCK, name,
-                        context.getSubject(), mode);
+                        mode);
                 break;
             case nfs_ftype4.NF4ATTRDIR:
             case nfs_ftype4.NF4NAMEDATTR:
