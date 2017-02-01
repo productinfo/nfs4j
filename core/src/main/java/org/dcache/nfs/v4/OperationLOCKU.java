@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2015 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2017 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -21,13 +21,11 @@ package org.dcache.nfs.v4;
 
 import org.dcache.nfs.ChimeraNFSException;
 import org.dcache.nfs.nfsstat;
-import org.dcache.nfs.status.InvalException;
 import org.dcache.nfs.status.LockRangeException;
 import org.dcache.nfs.status.ServerFaultException;
 import org.dcache.nfs.v4.nlm.LockException;
 import org.dcache.nfs.v4.nlm.LockRangeUnavailabeException;
 import org.dcache.nfs.v4.nlm.NlmLock;
-import org.dcache.nfs.v4.xdr.lock_owner4;
 import org.dcache.nfs.v4.xdr.nfs_argop4;
 import org.dcache.nfs.v4.xdr.nfs_opnum4;
 import org.dcache.nfs.v4.xdr.nfs_resop4;
@@ -51,13 +49,9 @@ public class OperationLOCKU extends AbstractNFSv4Operation {
 
         stateid4 lockStateid = Stateids.getCurrentStateidIfNeeded(context, _args.oplocku.lock_stateid);
         NFS4Client client;
-        lock_owner4 lockOwner;
+        StateOwner lockOwner;
         NFS4State lock_state;
         try {
-
-            if (_args.oplocku.length.value == 0 ) {
-                throw new InvalException("zerro lock len");
-            }
 
             if (context.getMinorversion() == 0) {
                 client = context.getStateHandler().getClientIdByStateId(lockStateid);
@@ -66,7 +60,10 @@ public class OperationLOCKU extends AbstractNFSv4Operation {
             }
 
             lock_state = client.state(lockStateid);
-            lockOwner = new lock_owner4(lock_state.getStateOwner());
+            lockOwner = lock_state.getStateOwner();
+            if (context.getMinorversion() == 0) {
+                lockOwner.acceptAsNextSequence(_args.oplocku.seqid);
+            }
 
             NlmLock lock = new NlmLock(lockOwner, _args.oplocku.locktype, _args.oplocku.offset.value, _args.oplocku.length.value);
             context.getLm().unlock(inode.getFileId(), lock);

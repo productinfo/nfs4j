@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2016 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2017 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -19,13 +19,15 @@
  */
 package org.dcache.nfs.v4;
 
+import com.google.common.base.MoreObjects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
-import org.dcache.nfs.v4.xdr.state_owner4;
+import org.dcache.nfs.ChimeraNFSException;
 import org.dcache.nfs.v4.xdr.stateid4;
 
 public class NFS4State {
@@ -49,23 +51,23 @@ public class NFS4State {
      */
 
     private final stateid4 _stateid;
-    private final state_owner4 _owner;
+    private final StateOwner _owner;
     private boolean _isConfimed = false;
     private boolean _disposed = false;
 
     /**
      * A state (lock, layout)) can be derived from an open state.
      * If null, then this is the original open state.
-     */ 
+     */
     private final NFS4State _openState;
 
     private final List<StateDisposeListener> _disposeListeners;
 
-    public NFS4State(state_owner4 owner, stateid4 stateid) {
+    public NFS4State(StateOwner owner, stateid4 stateid) {
         this(null, owner, stateid);
     }
 
-    public NFS4State(NFS4State openState, state_owner4 owner, stateid4 stateid) {
+    public NFS4State(NFS4State openState, StateOwner owner, stateid4 stateid) {
         _openState = openState;
         _owner = owner;
         _stateid = stateid;
@@ -93,20 +95,39 @@ public class NFS4State {
     /**
      * Release resources used by this State if not released yet.
      * Any subsequent call will have no effect.
+     * @throws ChimeraNFSException on errors.
      */
-    synchronized public final void tryDispose() {
+    synchronized public final void tryDispose() throws ChimeraNFSException {
         if (!_disposed) {
+            Iterator<StateDisposeListener> i = _disposeListeners.iterator();
+            while(i.hasNext()) {
+                StateDisposeListener listener = i.next();
+                listener.notifyDisposed(this);
+                i.remove();
+            }
             dispose();
-            _disposeListeners.forEach(this::tryNotifyDisposal);
             _disposed = true;
         }
     }
 
-    private void tryNotifyDisposal(StateDisposeListener listener) {
-        try {
-            listener.notifyDisposed(this);
-        } catch (RuntimeException e) {
-            LOG.error("Bug detected notifying {}", listener, e);
+    /**
+     * Release resources used by this State if not released yet. Any subsequent
+     * call will have no effect.
+     */
+    synchronized public final void disposeIgnoreFailures() {
+        if (!_disposed) {
+            Iterator<StateDisposeListener> i = _disposeListeners.iterator();
+            while (i.hasNext()) {
+                StateDisposeListener listener = i.next();
+                try {
+                    listener.notifyDisposed(this);
+                } catch (ChimeraNFSException e) {
+                    LOG.info("failed to notify: {}", e.getMessage());
+                }
+                i.remove();
+            }
+            dispose();
+            _disposed = true;
         }
     }
 
@@ -121,7 +142,22 @@ public class NFS4State {
         // NOP
     }
 
+    public StateOwner getStateOwner() {
+        return _owner;
+    }
+
     synchronized public void addDisposeListener(StateDisposeListener disposeListener) {
         _disposeListeners.add(disposeListener);
+    }
+
+    @Override
+    public String toString() {
+        return MoreObjects.toStringHelper(this.getClass().getSimpleName())
+                .add("stateid", _stateid)
+                .add("open-stateid", _openState == null? null : _openState.stateid())
+                .add("owner", _owner)
+                .add("confirmed", _isConfimed)
+                .omitNullValues()
+                .toString();
     }
 }

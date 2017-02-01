@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2017 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -20,7 +20,7 @@
 package org.dcache.nfs.v4.nlm;
 
 import com.google.common.base.MoreObjects;
-import org.dcache.nfs.v4.xdr.lock_owner4;
+import org.dcache.nfs.v4.StateOwner;
 import org.dcache.nfs.v4.xdr.nfs4_prot;
 import org.dcache.nfs.v4.xdr.nfs_lock_type4;
 
@@ -30,7 +30,7 @@ public class NlmLock {
      * Opaque object that identifies the host or process that is holding the
      * lock.
      */
-    private final lock_owner4 owner;
+    private final StateOwner owner;
     /**
      * Identifies offset where locked region starts
      */
@@ -45,14 +45,14 @@ public class NlmLock {
      */
     private final int lockType;
 
-    public NlmLock(lock_owner4 owner, int lockType, long offset, long length) {
+    public NlmLock(StateOwner owner, int lockType, long offset, long length) {
         this.owner = owner;
         this.offset = offset;
         this.length = length;
         this.lockType = lockType;
     }
 
-    public lock_owner4 getOwner() {
+    public StateOwner getOwner() {
         return owner;
     }
 

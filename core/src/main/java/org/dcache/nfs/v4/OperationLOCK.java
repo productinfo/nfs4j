@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2015 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2017 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -21,9 +21,7 @@ package org.dcache.nfs.v4;
 
 import org.dcache.nfs.ChimeraNFSException;
 import org.dcache.nfs.nfsstat;
-import org.dcache.nfs.status.BadStateidException;
 import org.dcache.nfs.status.InvalException;
-import org.dcache.nfs.status.OldStateidException;
 import org.dcache.nfs.status.OpenModeException;
 import org.dcache.nfs.status.ServerFaultException;
 import org.dcache.nfs.v4.nlm.LockDeniedException;
@@ -58,7 +56,7 @@ public class OperationLOCK extends AbstractNFSv4Operation {
         Inode inode = context.currentInode();
 
         if(_args.oplock.length.value == 0) {
-            throw new InvalException("zerro lock len");
+            throw new InvalException("zero lock len");
         }
 
         _args.oplock.offset.checkOverflow(_args.oplock.length, "offset + len overflow");
@@ -66,67 +64,61 @@ public class OperationLOCK extends AbstractNFSv4Operation {
         stateid4 oldStateid;
         NFS4Client client;
         NFS4State lock_state;
-        lock_owner4 lockOwner;
+        StateOwner lockOwner;
 
         if (_args.oplock.locker.new_lock_owner) {
             oldStateid = Stateids.getCurrentStateidIfNeeded(context, _args.oplock.locker.open_owner.open_stateid);
 
             if(context.getMinorversion() == 0) {
-                client = context.getStateHandler().getClientByID(_args.oplock.locker.open_owner.lock_owner.clientid);
-                client.validateSequence(_args.oplock.locker.open_owner.open_seqid);
-                lockOwner = _args.oplock.locker.open_owner.lock_owner;
+                client = context.getStateHandler().getClientIdByStateId(oldStateid);
+                context.getStateHandler().updateClientLeaseTime(oldStateid);
+                // poke lock owner to check it's validity
+                context.getStateHandler().getClientByID(_args.oplock.locker.open_owner.lock_owner.clientid);
             } else {
                 client = context.getSession().getClient();
-                lockOwner = new lock_owner4(client.asStateOwner());
-                // takse client id from session, byt use the provided ownerr as
-                // required by http://tools.ietf.org/html/rfc5661#section-18.11.3
-                lockOwner.owner = _args.oplock.locker.open_owner.lock_owner.owner;
             }
 
             NFS4State openState = client.state(oldStateid);
-
-            if (openState.stateid().seqid.value > oldStateid.seqid.value) {
-                throw new OldStateidException();
+            Stateids.checkStateId(openState.stateid(), oldStateid);
+            if (context.getMinorversion() == 0) {
+                openState.getStateOwner().acceptAsNextSequence(_args.oplock.locker.open_owner.open_seqid);
             }
 
-            if (openState.stateid().seqid.value < oldStateid.seqid.value) {
-                throw new BadStateidException();
-            }
-
-            // check open file mode
-            int shareAccess = context
-                    .getStateHandler()
-                    .getFileTracker()
-                    .getShareAccess(client, inode,
-                            openState.getOpenState().stateid());
-
-            if ( (shareAccess & nfs4_prot.OPEN4_SHARE_ACCESS_WRITE) == 0 &&
-                ((_args.oplock.locktype == nfs_lock_type4.WRITEW_LT) || (_args.oplock.locktype == nfs_lock_type4.WRITE_LT))) {
-                throw new OpenModeException("can't provide WRITE locl on read-only open");
-            }
+            lockOwner = client.getOrCreateOwner(_args.oplock.locker.open_owner.lock_owner.owner, _args.oplock.locker.open_owner.lock_seqid);
             lock_state = client.createState(lockOwner, openState);
+
+            // lock states do not requires extra confirmation
+            lock_state.confirm();
 
         } else {
             oldStateid = Stateids.getCurrentStateidIfNeeded(context, _args.oplock.locker.lock_owner.lock_stateid);
             client = context.getStateHandler().getClientIdByStateId(oldStateid);
             lock_state = client.state(oldStateid);
+            Stateids.checkStateId(lock_state.stateid(), oldStateid);
 
-            if(lock_state.stateid().seqid.value > oldStateid.seqid.value) {
-                throw new OldStateidException();
+            lockOwner = lock_state.getStateOwner();
+            if (context.getMinorversion() == 0) {
+                lockOwner.acceptAsNextSequence(_args.oplock.locker.lock_owner.lock_seqid);
             }
-
-            if (lock_state.stateid().seqid.value < oldStateid.seqid.value) {
-                throw new BadStateidException();
-            }
-
-            lockOwner = new lock_owner4(lock_state.getStateOwner());
         }
 
         try {
+
+            // reject write lock  on read-only open
+            if (_args.oplock.locktype == nfs_lock_type4.WRITEW_LT || _args.oplock.locktype == nfs_lock_type4.WRITE_LT) {
+
+                int shareAccess = context.getStateHandler().getFileTracker()
+                    .getShareAccess(client, inode, lock_state.getOpenState().stateid());
+
+                if ((shareAccess & nfs4_prot.OPEN4_SHARE_ACCESS_WRITE) == 0) {
+                    throw new OpenModeException("Invalid open mode");
+                }
+            }
+
             NlmLock lock = new NlmLock(lockOwner, _args.oplock.locktype,  _args.oplock.offset.value, _args.oplock.length.value);
             context.getLm().lock(inode.getFileId(), lock);
 
-            // ensure, that on close locks will be cleaned
+            // ensure, that on close locks will be released
             lock_state.addDisposeListener(s -> {
                 context.getLm().unlockIfExists(inode.getFileId(), lock);
             });
@@ -144,11 +136,10 @@ public class OperationLOCK extends AbstractNFSv4Operation {
             result.oplock.denied.offset = new offset4(conflictingLock.getOffset());
             result.oplock.denied.length = new length4(conflictingLock.getLength());
             result.oplock.denied.locktype = conflictingLock.getLockType();
-            result.oplock.denied.owner = conflictingLock.getOwner();
+            result.oplock.denied.owner = new lock_owner4(conflictingLock.getOwner().getRawStateOwner());
         } catch (LockException e) {
             throw new ServerFaultException("lock error", e);
         }
-
     }
 
 }

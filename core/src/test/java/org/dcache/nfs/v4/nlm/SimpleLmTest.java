@@ -1,10 +1,11 @@
 package org.dcache.nfs.v4.nlm;
 
 import java.nio.charset.StandardCharsets;
+import org.dcache.nfs.v4.StateOwner;
 import org.dcache.nfs.v4.xdr.clientid4;
-import org.dcache.nfs.v4.xdr.lock_owner4;
 import org.dcache.nfs.v4.xdr.nfs4_prot;
 import org.dcache.nfs.v4.xdr.nfs_lock_type4;
+import org.dcache.nfs.v4.xdr.state_owner4;
 import org.junit.Test;
 import org.junit.Before;
 
@@ -259,37 +260,6 @@ public class SimpleLmTest {
                 .test();
     }
 
-    @Test
-    public void shouldSplitWithoutRangeChange() throws LockException {
-        given().owner("owner1")
-                .on("file1")
-                .from(0)
-                .length(3)
-                .write()
-                .lock();
-
-        given().owner("owner1")
-                .on("file1")
-                .from(1)
-                .length(1)
-                .write()
-                .unlock();
-
-        given().owner("owner2")
-                .on("file1")
-                .from(1)
-                .length(1)
-                .write()
-                .test();
-
-        given().owner("owner2")
-                .on("file1")
-                .from(3)
-                .length(nfs4_prot.NFS4_UINT64_MAX)
-                .write()
-                .test();
-    }
-
     @Test(expected = LockDeniedException.class)
     public void shouldMergeOverlapingLocks() throws LockException {
         given().owner("owner1")
@@ -324,7 +294,7 @@ public class SimpleLmTest {
         private byte[] file;
         private long offset;
         private long length;
-        private lock_owner4 owner;
+        private StateOwner owner;
         private int lockType;
 
         LockBuilder on(String file) {
@@ -333,9 +303,11 @@ public class SimpleLmTest {
         }
 
         LockBuilder owner(String owner) {
-            this.owner = new lock_owner4();
-            this.owner.owner = owner.getBytes(StandardCharsets.UTF_8);
-            this.owner.clientid = new clientid4(1);
+            state_owner4 so = new state_owner4();
+
+            so.owner = owner.getBytes(StandardCharsets.UTF_8);
+            so.clientid = new clientid4(1);
+            this.owner = new StateOwner(so, 1);
             return this;
         }
 

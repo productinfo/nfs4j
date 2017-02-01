@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2015 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2016 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -85,10 +85,8 @@ public class CompoundContext {
     private final ExportFile _exportFile;
     private final NFSv41DeviceManager _deviceManager;
     private final NFSv4StateHandler _stateHandler;
-    private int _slotId;
+    private SessionSlot _slot;
     private boolean _cacheThis;
-    private final int _totalOperationsCount;
-    private int _currentOpPosition = -1;
     private stateid4 _currentStateid = null;
     private stateid4 _savedStateid = null;
     private final Principal _principal;
@@ -107,7 +105,7 @@ public class CompoundContext {
             NFSv4StateHandler stateHandler,
             LockManager nlm,
             NFSv41DeviceManager deviceManager, RpcCall call,
-            ExportFile exportFile, int opCount) {
+            ExportFile exportFile) {
         _minorversion = minorversion;
         _fs = fs;
         _deviceManager = deviceManager;
@@ -115,7 +113,6 @@ public class CompoundContext {
         _exportFile = exportFile;
         _subject = call.getCredential().getSubject();
         _stateHandler = stateHandler;
-        _totalOperationsCount = opCount;
         _principal = principalOf(call);
         _nlm = nlm;
     }
@@ -249,12 +246,20 @@ public class CompoundContext {
         return _stateHandler;
     }
 
-    public int getSlotId() {
-        return _slotId;
+    /**
+     * Get sessions reply cache slot which must be used by this request.
+     * @return session's reply cache slot
+     */
+    public SessionSlot getSessionSlot() {
+        return _slot;
     }
 
-    public void setSlotId(int slotId) {
-        _slotId = slotId;
+    /**
+     * Set session's reply cache slot to be used.
+     * @param slot reply cache slot to be used.
+     */
+    public void setSessionSlot(SessionSlot slot) {
+        _slot = slot;
     }
 
     public boolean cacheThis() {
@@ -273,19 +278,6 @@ public class CompoundContext {
 
     public void setCache(List<nfs_resop4> cache) {
         _cache = cache;
-    }
-
-    public int getOperationPosition() {
-        return _currentOpPosition;
-    }
-
-    public int getTotalOperationCount() {
-        return _totalOperationsCount;
-    }
-
-    public void nextOperation() {
-        assert _currentOpPosition < _totalOperationsCount;
-        _currentOpPosition ++;
     }
 
     public stateid4 currentStateid() throws ChimeraNFSException {

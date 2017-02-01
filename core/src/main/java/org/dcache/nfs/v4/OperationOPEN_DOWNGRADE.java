@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2016 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2017 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -72,9 +72,14 @@ public class OperationOPEN_DOWNGRADE extends AbstractNFSv4Operation {
         if (context.getMinorversion() > 0) {
             client = context.getSession().getClient();
         } else {
-
             client = context.getStateHandler().getClientIdByStateId(stateid);
-            client.validateSequence(_args.opopen_downgrade.seqid);
+        }
+
+        NFS4State nfsState = client.state(stateid);
+        Stateids.checkStateId(nfsState.stateid(), stateid);
+
+        if (context.getMinorversion() == 0) {
+            nfsState.getStateOwner().acceptAsNextSequence(_args.opopen_downgrade.seqid);
         }
 
         res.status = nfsstat.NFS_OK;

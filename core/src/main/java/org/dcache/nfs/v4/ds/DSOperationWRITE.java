@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2014 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2017 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -61,6 +61,8 @@ public class DSOperationWRITE extends AbstractNFSv4Operation {
 
         long offset = _args.opwrite.offset.value;
 
+        _args.opwrite.offset.checkOverflow(_args.opwrite.data.remaining(), "offset + length overflow");
+
         Inode inode = context.currentInode();
         Stat stat = context.getFs().getattr(inode);
 
@@ -84,6 +86,8 @@ public class DSOperationWRITE extends AbstractNFSv4Operation {
 
         FileChannel out = _fsCache.get(inode);
 
+        long lastSize = out.size();
+
         _args.opwrite.data.rewind();
         int bytesWritten = out.write(_args.opwrite.data, offset);
 
@@ -98,10 +102,12 @@ public class DSOperationWRITE extends AbstractNFSv4Operation {
         res.resok4.writeverf = new verifier4();
         res.resok4.writeverf.value = new byte[nfs4_prot.NFS4_VERIFIER_SIZE];
 
-        if ((bytesWritten > 0) && (_args.opwrite.stable != stable_how4.UNSTABLE4)) {
-            Stat newStat = new Stat();
-            newStat.setSize(out.size());
-            context.getFs().setattr(context.currentInode(), newStat);
+        synchronized(out) {
+            if ((_args.opwrite.stable != stable_how4.UNSTABLE4) && (offset + bytesWritten > lastSize)) {
+                Stat newStat = new Stat();
+                newStat.setSize(out.size());
+                context.getFs().setattr(context.currentInode(), newStat);
+            }
         }
         _log.debug("MOVER: {}@{} written, {} requested. New File size {}",
                 bytesWritten, offset, _args.opwrite.data, out.size());

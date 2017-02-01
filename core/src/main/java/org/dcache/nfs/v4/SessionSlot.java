@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2016 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2017 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -19,10 +19,9 @@
  */
 package org.dcache.nfs.v4;
 
+import java.util.Collections;
 import java.util.List;
-import org.dcache.nfs.ChimeraNFSException;
 import org.dcache.nfs.v4.xdr.nfs_resop4;
-import org.dcache.nfs.status.RetryUncacheRepException;
 import org.dcache.nfs.status.SeqMisorderedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,13 +41,25 @@ public class SessionSlot {
     }
 
     /**
+     * Acquire the session cache slot for a given sequence number. The
+     * value of {@code sequence} is compared to the previous sequence id, with
+     * three possible outcomes:
+     * <ul>
+     *   <li> If the provided sequence id and the previous sequence id are the
+     *         same then the request is a retry.  The previous reply is returned
+     *         or an empty List if no reply was recorded.
+     *   <li> If the provided sequence id is one greater than the previous sequence
+     *         id then this is a new request and null is returned.
+     *   <li> For all other provided sequence id values a {@link SeqMisorderedException}
+     *         is thrown.
+     * </ul>
      *
-     * @param sequence
-     * @param reply
-     * @return true if retransmit is detected and cached reply available.
-     * @throws ChimeraNFSException
+     * @param sequence  the sequence number of the request for the reply cache entry
+     * @return the list of cached replies, possibly empty or {@code null}
+     * cached reply does not exist.
+     * @throws SeqMisorderedException if {@code sequnce} is out of order.
      */
-    List<nfs_resop4> checkSlotSequence(int sequence, boolean checkCache) throws ChimeraNFSException {
+    List<nfs_resop4> acquire(int sequence) throws SeqMisorderedException {
 
         if( sequence == _sequence ) {
 
@@ -57,9 +68,7 @@ public class SessionSlot {
                 return _reply;
             }
 
-            if(checkCache)
-                throw new RetryUncacheRepException();
-            return null;
+            return Collections.emptyList();
         }
 
         int validValue = _sequence + 1;

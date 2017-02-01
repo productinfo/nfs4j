@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2015 - 2017 Deutsches Elektronen-Synchroton,
+ * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
+ *
+ * This library is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Library General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Library General Public License for more details.
+ *
+ * You should have received a copy of the GNU Library General Public
+ * License along with this program (see the file COPYING.LIB for more
+ * details); if not, write to the Free Software Foundation, Inc.,
+ * 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
 package org.dcache.nfs.v4.nlm;
 
 import com.google.common.collect.ArrayListMultimap;
@@ -11,11 +30,12 @@ import org.dcache.nfs.v4.xdr.nfs4_prot;
 import org.dcache.utils.Opaque;
 
 /**
- *
+ * Simple non-distributed implementation of {@link LockManager}.
+ * @since 0.14
  */
 public class SimpleLm implements LockManager {
 
-    private final Multimap locks = ArrayListMultimap.create();
+    private final Multimap<Opaque, NlmLock> locks = ArrayListMultimap.create();
 
     @Override
     public synchronized void lock(byte[] objId, NlmLock lock) throws LockException {
@@ -101,8 +121,6 @@ public class SimpleLm implements LockManager {
         Collection<NlmLock> currentLocks = locks.get(fh);
         Optional<NlmLock> conflictingLock = currentLocks.stream()
                 .filter(l -> l.isOverlappingRange(lock) && !l.isSameOwner(lock))
-//                .filter(l -> !l.equals(lock)) // exact match allowed
-//                .filter(l -> !(l.isSameOwner(lock) && l.getOffset() > lock.getOffset() && l.getLength() < lock.getLength()) ) // within existing lock
                 .findAny();
 
         if (conflictingLock.isPresent()) {

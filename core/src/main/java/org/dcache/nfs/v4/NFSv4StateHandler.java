@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2016 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2017 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -24,26 +24,23 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.security.Principal;
-import org.dcache.nfs.v4.xdr.clientid4;
-import org.dcache.nfs.v4.xdr.stateid4;
-import org.dcache.nfs.ChimeraNFSException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import org.dcache.nfs.ChimeraNFSException;
 import org.dcache.nfs.status.BadSessionException;
 import org.dcache.nfs.status.BadStateidException;
 import org.dcache.nfs.status.StaleClientidException;
+import org.dcache.nfs.v4.xdr.clientid4;
+import org.dcache.nfs.v4.xdr.nfs4_prot;
 import org.dcache.nfs.v4.xdr.sessionid4;
 import org.dcache.nfs.v4.xdr.stateid4;
 import org.dcache.nfs.v4.xdr.verifier4;
 import org.dcache.utils.Bytes;
 import org.dcache.utils.Cache;
+import org.dcache.utils.CacheElement;
 import org.dcache.utils.NopCacheEventListener;
 
 import static com.google.common.base.Preconditions.checkState;
@@ -53,14 +50,17 @@ public class NFSv4StateHandler {
     private static final Logger _log = LoggerFactory.getLogger(NFSv4StateHandler.class);
 
     /**
+     * initial value of new state's sequence number.
+     */
+    private final static int STATE_INITIAL_SEQUENCE = 1;
+
+    /**
      * client id generator.
      */
     private final AtomicInteger _clientId = new AtomicInteger(0);
 
     // mapping between server generated clietid and nfs_client_id, not confirmed yet
-    private final Map<Long, NFS4Client> _clientsByServerId = new HashMap<>();
-
-    private final Cache<sessionid4, NFSv41Session> _sessionById;
+    private final Cache<clientid4, NFS4Client> _clientsByServerId;
 
     /**
      * Client's lease expiration time in milliseconds.
@@ -82,9 +82,9 @@ public class NFSv4StateHandler {
 
     NFSv4StateHandler(long leaseTime, int instanceId) {
         _leaseTime = TimeUnit.SECONDS.toMillis(leaseTime);
-        _sessionById = new Cache<>("NFSv41 sessions", 5000, Long.MAX_VALUE,
+        _clientsByServerId = new Cache<>("NFSv41 clients", 5000, Long.MAX_VALUE,
                 _leaseTime * 2,
-                new DeadSessionCollector(),
+                new DeadClientCollector(),
                 _leaseTime * 4, TimeUnit.MILLISECONDS);
 
         _running = true;
@@ -95,9 +95,7 @@ public class NFSv4StateHandler {
 
 	synchronized (this) {
 	    checkState(_running, "NFS state handler not running");
-
-            client.sessions().forEach(s -> _sessionById.remove(s.id()));
-	    _clientsByServerId.remove(client.getId().value);
+	    _clientsByServerId.remove(client.getId());
 	}
         client.tryDispose();
     }
@@ -105,14 +103,14 @@ public class NFSv4StateHandler {
     private synchronized void addClient(NFS4Client newClient) {
 
         checkState(_running, "NFS state handler not running");
-        _clientsByServerId.put(newClient.getId().value, newClient);
+        _clientsByServerId.put(newClient.getId(), newClient);
     }
 
     public synchronized NFS4Client getClientByID(clientid4 clientid) throws ChimeraNFSException {
 
         checkState(_running, "NFS state handler not running");
 
-        NFS4Client client = _clientsByServerId.get(clientid.value);
+        NFS4Client client = _clientsByServerId.get(clientid);
         if(client == null) {
             throw new StaleClientidException("bad client id.");
         }
@@ -123,44 +121,31 @@ public class NFSv4StateHandler {
 
         checkState(_running, "NFS state handler not running");
 
-        NFS4Client client = _clientsByServerId.get(Bytes.getLong(stateId.other, 0));
+        clientid4 clientId = new clientid4(Bytes.getLong(stateId.other, 0));
+        NFS4Client client = _clientsByServerId.get(clientId);
         if (client == null) {
             throw new BadStateidException("no client for stateid: " + stateId);
         }
         return client;
     }
 
-    public synchronized NFSv41Session getSession( sessionid4 id) throws ChimeraNFSException {
+    public synchronized NFS4Client getClient(sessionid4 id) throws ChimeraNFSException {
         checkState(_running, "NFS state handler not running");
-       NFSv41Session session = _sessionById.get(id);
-        if (session == null) {
+        clientid4 clientId = new clientid4(Bytes.getLong(id.value, 0));
+        NFS4Client client = _clientsByServerId.get(clientId);
+        if (client == null) {
             throw new BadSessionException("session not found: " + id);
         }
-        return session;
-    }
-
-    public synchronized NFSv41Session removeSession(sessionid4 id) throws ChimeraNFSException {
-        NFSv41Session session = _sessionById.remove(id);
-        if (session == null) {
-            throw new BadSessionException("session not found: " + id);
-        }
-
-        detachSession(session);
-        return session;
-    }
-
-    public synchronized void addSession(NFSv41Session session) {
-        checkState(_running, "NFS state handler not running");
-        _sessionById.put(session.id(), session);
+        return client;
     }
 
     public synchronized NFS4Client clientByOwner(byte[] ownerid) {
-	for(NFS4Client client: _clientsByServerId.values()) {
-	    if (client.isOwner(ownerid)) {
-		return client;
-	    }
-	}
-        return null;
+        return _clientsByServerId.entries()
+                .stream()
+                .map(CacheElement::getObject)
+                .filter(c -> c.isOwner(ownerid))
+                .findAny()
+                .orElse(null);
     }
 
     public void updateClientLeaseTime(stateid4  stateid) throws ChimeraNFSException {
@@ -170,7 +155,7 @@ public class NFSv4StateHandler {
         NFS4State state = client.state(stateid);
 
         if( !state.isConfimed() ) {
-            _log.warn("State is not confirmed");
+            throw new BadStateidException("State is not confirmed"  );
         }
 
         Stateids.checkStateId(state.stateid(), stateid);
@@ -179,12 +164,14 @@ public class NFSv4StateHandler {
 
     public synchronized List<NFS4Client> getClients() {
         checkState(_running, "NFS state handler not running");
-        return new ArrayList<>(_clientsByServerId.values());
+        return _clientsByServerId.entries().stream()
+                .map(CacheElement::getObject)
+                .collect(Collectors.toList());
     }
 
     public NFS4Client createClient(InetSocketAddress clientAddress, InetSocketAddress localAddress, int minorVersion,
             byte[] ownerID, verifier4 verifier, Principal principal, boolean callbackNeeded) {
-        NFS4Client client = new NFS4Client(nextClientId(), minorVersion, clientAddress, localAddress, ownerID, verifier, principal, _leaseTime, callbackNeeded);
+        NFS4Client client = new NFS4Client(this, nextClientId(), minorVersion, clientAddress, localAddress, ownerID, verifier, principal, _leaseTime, callbackNeeded);
         addClient(client);
         return client;
     }
@@ -197,30 +184,12 @@ public class NFSv4StateHandler {
         return _openFileTracker;
     }
 
-    /**
-     * Detach session from the client. Removes client, if there are no sessions
-     * associated with client any more.
-     *
-     * @param session to detach.
-     */
-    private void detachSession(NFSv41Session session) {
-        NFS4Client client = session.getClient();
-        client.removeSession(session);
-
-        /*
-        * remove client if there is not sessions any more
-        */
-        if (!client.hasSessions()) {
-            removeClient(client);
-        }
-    }
-
-    private class DeadSessionCollector extends NopCacheEventListener<sessionid4, NFSv41Session> {
+    private class DeadClientCollector extends NopCacheEventListener<clientid4, NFS4Client> {
 
         @Override
-        public void notifyExpired(Cache<sessionid4, NFSv41Session> cache, NFSv41Session session) {
-            _log.info("Removing expired session: {}", session);
-            detachSession(session);
+        public void notifyExpired(Cache<clientid4, NFS4Client> cache, NFS4Client client) {
+            _log.info("Removing expired client: {}", client);
+            client.tryDispose();
         }
     }
 
@@ -239,15 +208,12 @@ public class NFSv4StateHandler {
     }
 
     private synchronized void drainClients() {
-        Iterator<NFS4Client> i = _clientsByServerId.values().iterator();
-        while (i.hasNext()) {
-            NFS4Client client = i.next();
-            client.sessions().stream()
-                    .map(NFSv41Session::id)
-                    .forEach(_sessionById::remove);
-            client.tryDispose();
-            i.remove();
-        }
+        _clientsByServerId.entries().stream()
+                .map(CacheElement::getObject)
+                .forEach(c -> {
+                    c.tryDispose();
+                    _clientsByServerId.remove(c.getId());
+                });
     }
 
     /**
@@ -257,7 +223,7 @@ public class NFSv4StateHandler {
         checkState(_running, "NFS state handler not running");
         _running = false;
         drainClients();
-        _sessionById.shutdown();
+        _clientsByServerId.shutdown();
     }
 
     /**
@@ -291,4 +257,42 @@ public class NFSv4StateHandler {
         long now = (System.currentTimeMillis() / 1000);
         return new clientid4((now << 32) | (_instanceId << 16) | (_clientId.incrementAndGet() & 0x0000FFFF));
     }
+
+    /**
+     * Generate new state id associated with a given {@code client}.
+     *
+     * we construct 'other' fileld of state IDs as following:
+     * |0 -  7| : client id
+     * |8 - 11| : clients state counter
+     *
+     * @param client nfs client for which state is generated.
+     * @param count the count of already generated state ids for give client.
+     * @return new state id.
+     */
+    public stateid4 createStateId(NFS4Client client, int count) {
+        byte[] other = new byte[12];
+        Bytes.putLong(other, 0, client.getId().value);
+        Bytes.putInt(other, 8, count);
+        return new stateid4(other, STATE_INITIAL_SEQUENCE);
+    }
+
+    /**
+     * Create new session identifier for a given {@code client}.
+     *
+     * we create session identifier as:
+     * |0 -  7| : client id
+     * |8 - 11| : reserved
+     * |12 -15| : sequence id
+     *
+     * @param client nfs client for which new session id is generated.
+     * @param sequence the count of already generated sessions for given client.
+     * @return new session id.
+     */
+    public sessionid4 createSessionId(NFS4Client client, int sequence) {
+        byte[] id = new byte[nfs4_prot.NFS4_SESSIONID_SIZE];
+        Bytes.putLong(id, 0, client.getId().value);
+        Bytes.putInt(id, 12, sequence);
+        return new sessionid4(id);
+    }
+
 }

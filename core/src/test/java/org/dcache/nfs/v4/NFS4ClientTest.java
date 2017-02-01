@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2016 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2017 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -25,11 +25,9 @@ import java.nio.charset.StandardCharsets;
 import org.dcache.nfs.ChimeraNFSException;
 import org.dcache.nfs.nfsstat;
 import org.dcache.nfs.v4.client.CloseStub;
-import org.dcache.nfs.v4.xdr.clientid4;
 import org.dcache.nfs.v4.xdr.nfs_argop4;
 import org.dcache.nfs.v4.xdr.nfs_opnum4;
 import org.dcache.nfs.v4.xdr.nfs_resop4;
-import org.dcache.nfs.v4.xdr.state_owner4;
 import org.dcache.nfs.v4.xdr.stateid4;
 import org.junit.Before;
 import org.junit.Test;
@@ -37,6 +35,10 @@ import org.junit.Test;
 import org.dcache.nfs.vfs.Inode;
 
 import static org.dcache.nfs.v4.NfsTestUtils.createClient;
+import org.dcache.nfs.v4.xdr.clientid4;
+import org.dcache.nfs.v4.xdr.seqid4;
+import org.dcache.nfs.v4.xdr.state_owner4;
+import static org.dcache.nfs.v4.NfsTestUtils.generateRpcCall;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -45,13 +47,13 @@ public class NFS4ClientTest {
 
     private NFSv4StateHandler stateHandler;
     private NFS4Client nfsClient;
-    private state_owner4 owner;
+    private StateOwner owner;
 
     @Before
     public void setUp() throws UnknownHostException, ChimeraNFSException {
         stateHandler = new NFSv4StateHandler();
         nfsClient = createClient(stateHandler);
-        owner = nfsClient.asStateOwner();
+        owner = nfsClient.getOrCreateOwner("client test".getBytes(StandardCharsets.UTF_8), new seqid4(0));
     }
 
     @Test
@@ -62,14 +64,14 @@ public class NFS4ClientTest {
         NFSv41Session session = nfsClient.createSession(1, 2, 1, 8, 8);
         NFS4State state = nfsClient.createState(owner);
 
-        nfs_argop4 close_args = CloseStub.generateRequest(state.stateid());
+        nfs_argop4 close_args = CloseStub.generateRequest(state.stateid(), 1);
         OperationCLOSE CLOSE = new OperationCLOSE(close_args);
         result = nfs_resop4.resopFor(nfs_opnum4.OP_CLOSE);
         context = new CompoundContextBuilder()
                 .withStateHandler(stateHandler)
-                .withOpCount(1)
                 .withMinorversion(1)
                 .withDeviceManager(mock(NFSv41DeviceManager.class))
+                .withCall(generateRpcCall())
                 .build();
 
         context.currentInode( Inode.forFile( new byte[] {}));
@@ -86,13 +88,13 @@ public class NFS4ClientTest {
 
         NFS4State state = nfsClient.createState(owner);
 
-        nfs_argop4 close_args = CloseStub.generateRequest(state.stateid());
+        nfs_argop4 close_args = CloseStub.generateRequest(state.stateid(), 1);
         OperationCLOSE CLOSE = new OperationCLOSE(close_args);
         result = nfs_resop4.resopFor(nfs_opnum4.OP_CLOSE);
         context = new CompoundContextBuilder()
                 .withStateHandler(stateHandler)
-                .withOpCount(1)
                 .withMinorversion(0)
+                .withCall(generateRpcCall())
                 .build();
 
         context.currentInode(Inode.forFile(new byte[]{}));
@@ -109,10 +111,11 @@ public class NFS4ClientTest {
     @Test
     public void testAttacheDetachState() throws ChimeraNFSException {
 
-        state_owner4 otherOwner = new state_owner4();
-        otherOwner.clientid = new clientid4(123);
-        otherOwner.owner = "someOtherOwner".getBytes(StandardCharsets.UTF_8);
-        NFS4State state = new NFS4State(otherOwner, new stateid4(new byte[] {}, 0));
+        state_owner4 so = new state_owner4();
+        so.clientid = nfsClient.getId();
+        so.owner = "someOtherOwner".getBytes(StandardCharsets.UTF_8);
+        StateOwner stateOwner = new StateOwner(so, 0);
+        NFS4State state = new NFS4State(stateOwner, new stateid4(new byte[] {}, 0));
 
         nfsClient.attachState(state);
         assertTrue(nfsClient.hasState());

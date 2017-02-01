@@ -19,40 +19,36 @@
  */
 package org.dcache.nfs.v4;
 
+import org.dcache.nfs.ChimeraNFSException;
 import org.dcache.nfs.nfsstat;
+import org.dcache.nfs.status.NotSuppException;
+import org.dcache.nfs.v4.xdr.lock_owner4;
 import org.dcache.nfs.v4.xdr.nfs_argop4;
 import org.dcache.nfs.v4.xdr.nfs_opnum4;
-import org.dcache.nfs.v4.xdr.RENEW4res;
-import org.dcache.nfs.ChimeraNFSException;
-import org.dcache.nfs.status.NotSuppException;
-import org.dcache.nfs.status.StaleClientidException;
 import org.dcache.nfs.v4.xdr.nfs_resop4;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class OperationRENEW extends AbstractNFSv4Operation {
+public class OperationRELEASE_LOCKOWNER extends AbstractNFSv4Operation {
 
-    private static final Logger _log = LoggerFactory.getLogger(OperationRENEW.class);
+    private static final Logger _log = LoggerFactory.getLogger(OperationRELEASE_LOCKOWNER.class);
 
-    public OperationRENEW(nfs_argop4 args) {
-        super(args, nfs_opnum4.OP_RENEW);
+    public OperationRELEASE_LOCKOWNER(nfs_argop4 args) {
+        super(args, nfs_opnum4.OP_RELEASE_LOCKOWNER);
     }
 
     @Override
     public void process(CompoundContext context, nfs_resop4 result) throws ChimeraNFSException {
 
-        final RENEW4res res = result.oprenew;
+        lock_owner4 lockOwner = _args.oprelease_lockowner.lock_owner;
 
         if (context.getMinorversion() > 0) {
-            throw new NotSuppException("operation RENEW4 is obsolete in 4.x, x > 0");
+            throw new NotSuppException("operation RELEASE_LOCKOWNER is obsolete in 4.x, x > 0");
         }
 
-        NFS4Client client = context.getStateHandler().getClientByID(_args.oprenew.clientid);
-        if (client == null) {
-            throw new StaleClientidException();
-        }
+        NFS4Client client = context.getStateHandler().getClientByID(lockOwner.clientid);
+        client.releaseOwner(lockOwner.owner);
 
-        client.updateLeaseTime();
-        res.status = nfsstat.NFS_OK;
+        result.oprelease_lockowner.status = nfsstat.NFS_OK;
     }
 }

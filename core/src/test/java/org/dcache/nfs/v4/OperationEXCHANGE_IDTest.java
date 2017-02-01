@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2015 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2017 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -32,6 +32,8 @@ import org.dcache.nfs.v4.client.SequenceStub;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.dcache.nfs.v4.NfsTestUtils.generateRpcCall;
+
 public class OperationEXCHANGE_IDTest {
 
     private NFSv4StateHandler stateHandler;
@@ -56,7 +58,7 @@ public class OperationEXCHANGE_IDTest {
         result = nfs_resop4.resopFor(nfs_opnum4.OP_EXCHANGE_ID);
         context = new CompoundContextBuilder()
                 .withStateHandler(stateHandler)
-                .withOpCount(1)
+                .withCall(generateRpcCall())
                 .build();
 
         AssertNFS.assertNFS(EXCHANGE_ID, context, result, nfsstat.NFS_OK);
@@ -73,7 +75,7 @@ public class OperationEXCHANGE_IDTest {
         result = nfs_resop4.resopFor(nfs_opnum4.OP_EXCHANGE_ID);
         context = new CompoundContextBuilder()
                 .withStateHandler(stateHandler)
-                .withOpCount(1)
+                .withCall(generateRpcCall())
                 .build();
 
         AssertNFS.assertNFS(EXCHANGE_ID, context, result, nfsstat.NFS_OK);
@@ -91,7 +93,7 @@ public class OperationEXCHANGE_IDTest {
         result = nfs_resop4.resopFor(nfs_opnum4.OP_EXCHANGE_ID);
         context = new CompoundContextBuilder()
                 .withStateHandler(stateHandler)
-                .withOpCount(1)
+                .withCall(generateRpcCall())
                 .build();
 
         AssertNFS.assertNFS(EXCHANGE_ID, context, result, nfsstat.NFS_OK);
@@ -103,7 +105,7 @@ public class OperationEXCHANGE_IDTest {
         result = nfs_resop4.resopFor(nfs_opnum4.OP_CREATE_SESSION);
         context = new CompoundContextBuilder()
                 .withStateHandler(stateHandler)
-                .withOpCount(1)
+                .withCall(generateRpcCall())
                 .build();
 
          AssertNFS.assertNFS(CREATE_SESSION, context, result, nfsstat.NFS_OK);
@@ -122,7 +124,7 @@ public class OperationEXCHANGE_IDTest {
         result = nfs_resop4.resopFor(nfs_opnum4.OP_EXCHANGE_ID);
         context = new CompoundContextBuilder()
                 .withStateHandler(stateHandler)
-                .withOpCount(1)
+                .withCall(generateRpcCall())
                 .build();
 
         AssertNFS.assertNFS(EXCHANGE_ID, context, result, nfsstat.NFS_OK);
@@ -134,7 +136,7 @@ public class OperationEXCHANGE_IDTest {
         result = nfs_resop4.resopFor(nfs_opnum4.OP_CREATE_SESSION);
         context = new CompoundContextBuilder()
                 .withStateHandler(stateHandler)
-                .withOpCount(1)
+                .withCall(generateRpcCall())
                 .build();
 
          AssertNFS.assertNFS(CREATE_SESSION, context, result, nfsstat.NFS_OK);
@@ -156,7 +158,7 @@ public class OperationEXCHANGE_IDTest {
         result = nfs_resop4.resopFor(nfs_opnum4.OP_EXCHANGE_ID);
         context = new CompoundContextBuilder()
                 .withStateHandler(stateHandler)
-                .withOpCount(1)
+                .withCall(generateRpcCall())
                 .build();
 
         AssertNFS.assertNFS(EXCHANGE_ID, context, result, nfsstat.NFS_OK);
@@ -168,7 +170,7 @@ public class OperationEXCHANGE_IDTest {
         result = nfs_resop4.resopFor(nfs_opnum4.OP_CREATE_SESSION);
         context = new CompoundContextBuilder()
                 .withStateHandler(stateHandler)
-                .withOpCount(1)
+                .withCall(generateRpcCall())
                 .build();
 
          AssertNFS.assertNFS(CREATE_SESSION, context, result, nfsstat.NFS_OK);

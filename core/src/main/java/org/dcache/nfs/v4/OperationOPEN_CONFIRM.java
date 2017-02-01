@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2015 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2017 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -28,6 +28,7 @@ import org.dcache.nfs.v4.xdr.OPEN_CONFIRM4resok;
 import org.dcache.nfs.v4.xdr.OPEN_CONFIRM4res;
 import org.dcache.nfs.status.InvalException;
 import org.dcache.nfs.status.IsDirException;
+import org.dcache.nfs.status.NotSuppException;
 import org.dcache.nfs.v4.xdr.nfs_resop4;
 import org.dcache.nfs.vfs.Inode;
 import org.dcache.nfs.vfs.Stat;
@@ -47,6 +48,10 @@ public class OperationOPEN_CONFIRM extends AbstractNFSv4Operation {
 
         final OPEN_CONFIRM4res res = result.opopen_confirm;
 
+        if (context.getMinorversion() > 0) {
+            throw new NotSuppException("operation OPEN_CONFIRM4 is obsolete in 4.x, x > 0");
+        }
+
         Inode inode = context.currentInode();
         Stat stat = context.getFs().getattr(context.currentInode());
 
@@ -62,8 +67,8 @@ public class OperationOPEN_CONFIRM extends AbstractNFSv4Operation {
         _log.debug("confirmed stateID: {}", stateid);
 
         NFS4Client client = context.getStateHandler().getClientIdByStateId(stateid);
-        client.validateSequence(_args.opopen_confirm.seqid);
         NFS4State state = client.state(stateid);
+        state.getStateOwner().acceptAsNextSequence(_args.opopen_confirm.seqid);
 
         state.bumpSeqid();
         state.confirm();

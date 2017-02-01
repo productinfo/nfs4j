@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2015 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2017 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -33,6 +33,7 @@ import org.dcache.nfs.v4.xdr.nfs_argop4;
 import org.dcache.nfs.v4.xdr.nfs_opnum4;
 import org.dcache.nfs.v4.xdr.nfs_resop4;
 import org.dcache.nfs.v4.xdr.offset4;
+import org.dcache.nfs.v4.xdr.state_owner4;
 import org.dcache.nfs.vfs.Inode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,21 +52,20 @@ public class OperationLOCKT extends AbstractNFSv4Operation {
         Inode inode = context.currentInode();
 
         if (_args.oplockt.length.value == 0) {
-            throw new InvalException("zerro lock len");
+            throw new InvalException("zero lock len");
         }
 
         try {
 
-            lock_owner4 lockOwner;
-            if (context.getMinorversion() == 0) {
-                lockOwner = _args.oplockt.owner;
-            } else {
-                NFS4Client client = context.getSession().getClient();
-                lockOwner = new lock_owner4(client.asStateOwner());
-                // takse client id from session, byt use the provided ownerr as
-                // required by http://tools.ietf.org/html/rfc5661#section-18.11.3
-                lockOwner.owner = _args.oplockt.owner.owner;
-            }
+            /*
+            * this is a hypothetic lock owner, which used for lock-test and might
+            * not exist on the server.
+            */
+            state_owner4 hypotheticLockOwner = new state_owner4();
+            hypotheticLockOwner.clientid = _args.oplockt.owner.clientid;
+            hypotheticLockOwner.owner = _args.oplockt.owner.owner;
+
+            StateOwner lockOwner = new StateOwner(hypotheticLockOwner, 0);
 
             NlmLock lock = new NlmLock(lockOwner, _args.oplockt.locktype, _args.oplockt.offset.value, _args.oplockt.length.value);
             context.getLm().test(inode.getFileId(), lock);
@@ -79,7 +79,7 @@ public class OperationLOCKT extends AbstractNFSv4Operation {
             result.oplockt.denied.offset = new offset4(conflictingLock.getOffset());
             result.oplockt.denied.length = new length4(conflictingLock.getLength());
             result.oplockt.denied.locktype = conflictingLock.getLockType();
-            result.oplockt.denied.owner = conflictingLock.getOwner();
+            result.oplockt.denied.owner = new lock_owner4(conflictingLock.getOwner().getRawStateOwner());
         } catch (LockException e) {
             throw new ServerFaultException("lock error", e);
         }

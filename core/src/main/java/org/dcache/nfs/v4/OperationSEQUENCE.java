@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2015 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2016 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -46,17 +46,11 @@ public class OperationSEQUENCE extends AbstractNFSv4Operation {
     public void process(CompoundContext context, nfs_resop4 result) throws ChimeraNFSException {
         final SEQUENCE4res res = result.opsequence;
 
-        NFSv41Session session = context.getStateHandler().getSession(_args.opsequence.sa_sessionid);
-        NFS4Client client = session.getClient();
+        NFS4Client client = context.getStateHandler().getClient(_args.opsequence.sa_sessionid);
+        NFSv41Session session = client.getSession(_args.opsequence.sa_sessionid);
 
-        if (!client.hasSessions()) {
-            _log.debug("no client for session for id [{}]", _args.opsequence.sa_sessionid);
-            throw new BadSessionException("client not found");
-        }
-
-        int opCount = context.getTotalOperationCount();
-        context.setCache(session.checkCacheSlot(_args.opsequence.sa_slotid.value,
-                _args.opsequence.sa_sequenceid.value, opCount > 1));
+        SessionSlot slot = session.getSessionSlot(_args.opsequence.sa_slotid.value);
+        context.setCache(slot.acquire(_args.opsequence.sa_sequenceid.value));
 
         session.bindIfNeeded( new SessionConnection(
                 context.getLocalSocketAddress(),
@@ -67,7 +61,7 @@ public class OperationSEQUENCE extends AbstractNFSv4Operation {
 
         context.setSession(session);
         context.setCacheThis(_args.opsequence.sa_cachethis);
-        context.setSlotId(_args.opsequence.sa_slotid.value);
+        context.setSessionSlot(slot);
 
         res.sr_resok4 = new SEQUENCE4resok();
 

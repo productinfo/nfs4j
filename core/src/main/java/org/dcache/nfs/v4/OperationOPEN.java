@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2016 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2017 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -22,8 +22,21 @@ package org.dcache.nfs.v4;
 import java.io.IOException;
 import java.util.Optional;
 
-import org.dcache.nfs.v4.xdr.*;
+import org.dcache.nfs.v4.xdr.open_delegation_type4;
+import org.dcache.nfs.v4.xdr.change_info4;
+import org.dcache.nfs.v4.xdr.bitmap4;
+import org.dcache.nfs.v4.xdr.nfs4_prot;
+import org.dcache.nfs.v4.xdr.nfs_argop4;
+import org.dcache.nfs.v4.xdr.changeid4;
 import org.dcache.nfs.nfsstat;
+import org.dcache.nfs.v4.xdr.uint32_t;
+import org.dcache.nfs.v4.xdr.opentype4;
+import org.dcache.nfs.v4.xdr.open_claim_type4;
+import org.dcache.nfs.v4.xdr.open_delegation4;
+import org.dcache.nfs.v4.xdr.createmode4;
+import org.dcache.nfs.v4.xdr.nfs_opnum4;
+import org.dcache.nfs.v4.xdr.OPEN4resok;
+import org.dcache.nfs.v4.xdr.OPEN4res;
 import org.dcache.nfs.ChimeraNFSException;
 import org.dcache.nfs.status.AccessException;
 import org.dcache.nfs.status.BadXdrException;
@@ -36,6 +49,10 @@ import org.dcache.nfs.status.NoGraceException;
 import org.dcache.nfs.status.StaleClientidException;
 import org.dcache.nfs.status.SymlinkException;
 import org.dcache.nfs.status.WrongTypeException;
+import org.dcache.nfs.v4.xdr.fattr4_size;
+import org.dcache.nfs.v4.xdr.mode4;
+import org.dcache.nfs.v4.xdr.nfs_resop4;
+import org.dcache.nfs.v4.xdr.stateid4;
 import org.dcache.nfs.vfs.Inode;
 import org.dcache.nfs.vfs.Stat;
 import org.dcache.xdr.OncRpcException;
@@ -55,20 +72,20 @@ public class OperationOPEN extends AbstractNFSv4Operation {
         final OPEN4res res = result.opopen;
 
         NFS4Client client;
+        StateOwner owner;
         if (context.getMinorversion() > 0) {
             client = context.getSession().getClient();
         } else {
-            clientid4 clientid = _args.opopen.owner.clientid;
-            client = context.getStateHandler().getClientByID(clientid);
-
+            client = context.getStateHandler().getClientByID(_args.opopen.owner.clientid);
             if (client == null || !client.isConfirmed()) {
                 throw new StaleClientidException("bad client id.");
             }
 
-            client.validateSequence(_args.opopen.seqid);
             client.updateLeaseTime();
             _log.debug("open request form {}", _args.opopen.owner);
         }
+
+        owner = client.getOrCreateOwner(_args.opopen.owner.owner, _args.opopen.seqid);
 
         res.resok4 = new OPEN4resok();
         res.resok4.attrset = new bitmap4();
@@ -140,7 +157,7 @@ public class OperationOPEN extends AbstractNFSv4Operation {
 
                         _log.debug("Creating a new file: {}", name);
                         inode = context.getFs().create(context.currentInode(), Stat.Type.REGULAR,
-                                name, mode);
+                                name, context.getSubject(), mode);
 
                         res.resok4.cinfo.after = new changeid4(System.currentTimeMillis());
                     } catch (ExistException e) {
@@ -243,8 +260,6 @@ public class OperationOPEN extends AbstractNFSv4Operation {
          * THis is a perfectly a valid situation as at the end file is created and only
          * one writer is allowed.
          */
-        state_owner4 owner = context.getMinorversion() == 0
-                ?_args.opopen.owner : client.asStateOwner();
         stateid4 stateid = context
                 .getStateHandler()
                 .getFileTracker()
