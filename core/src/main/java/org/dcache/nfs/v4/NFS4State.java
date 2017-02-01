@@ -76,10 +76,6 @@ public class NFS4State {
 
     public void bumpSeqid() { ++ _stateid.seqid.value; }
 
-    public state_owner4 getStateOwner() {
-        return _owner;
-    }
-
     public stateid4 stateid() {
         return _stateid;
     }
