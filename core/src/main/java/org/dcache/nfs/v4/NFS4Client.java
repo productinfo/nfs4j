@@ -128,7 +128,6 @@ public class NFS4Client {
      * sessions associated with the client
      */
     private final Map<sessionid4, NFSv41Session> _sessions = new HashMap<>();
-    private long _cl_time = System.currentTimeMillis();        // time of last lease renewal
 
     /**
      * Open Owners associated with client.
@@ -261,7 +260,7 @@ public class NFS4Client {
     }
 
     public synchronized boolean isLeaseValid() {
-        return (System.currentTimeMillis() - _cl_time) < _leaseTime;
+        return true;
     }
 
     /**
@@ -270,24 +269,12 @@ public class NFS4Client {
      * @throws ExpiredException if difference between current time and last
      * lease more than max_lease_time
      */
-    public synchronized void updateLeaseTime() throws ChimeraNFSException {
-
-        long curentTime = System.currentTimeMillis();
-        long delta = curentTime - _cl_time;
-        if (delta > _leaseTime) {
-            drainStates();
-            throw new ExpiredException("lease time expired: (" + delta +"): " + Bytes.toHexString(_ownerId) +
-                    " (" + _clientId + ").");
-        }
-        _cl_time = curentTime;
-    }
+    public synchronized void updateLeaseTime() throws ChimeraNFSException {}
 
     /**
      * sets client lease time with current time
      */
-    public synchronized void refreshLeaseTime() {
-        _cl_time = System.currentTimeMillis();
-    }
+    public synchronized void refreshLeaseTime() {}
 
     /**
      * re-initialize client
