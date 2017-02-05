@@ -164,11 +164,6 @@ public class NFS4Client {
     private ClientCB _cl_cb = null; /* callback info */
 
     /**
-     * lease expiration time in milliseconds.
-     */
-    private final long _leaseTime;
-
-    /**
      * A flag to indicate that the client already have
      * reclaimed associated states.
      */
@@ -200,8 +195,7 @@ public class NFS4Client {
 
         _clientAddress = clientAddress;
         _localAddress = localAddress;
-        _leaseTime = leaseTime;
-	_reclaim_completed = false;
+	    _reclaim_completed = false;
         _callbackNeeded = calbackNeeded;
         _minorVersion = minorVersion;
         _log.debug("New client: {}", this);
