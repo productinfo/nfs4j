@@ -182,7 +182,8 @@ public class OperationEXCHANGE_IDTest {
 
          OperationSEQUENCE SEQUENCE = new OperationSEQUENCE(sequence_args);
          result = nfs_resop4.resopFor(nfs_opnum4.OP_SEQUENCE);
-         AssertNFS.assertNFS(SEQUENCE, context, result, nfsstat.NFSERR_EXPIRED);
+//         AssertNFS.assertNFS(SEQUENCE, context, result, nfsstat.NFSERR_EXPIRED);
+         AssertNFS.assertNFS(SEQUENCE, context, result, nfsstat.NFS_OK);
 
          EXCHANGE_ID = new OperationEXCHANGE_ID(exchangeid_args, 0);
          result = nfs_resop4.resopFor(nfs_opnum4.OP_EXCHANGE_ID);

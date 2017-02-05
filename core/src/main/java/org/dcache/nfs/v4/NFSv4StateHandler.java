@@ -19,16 +19,6 @@
  */
 package org.dcache.nfs.v4;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.net.InetSocketAddress;
-import java.security.Principal;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
-
 import org.dcache.nfs.ChimeraNFSException;
 import org.dcache.nfs.status.BadSessionException;
 import org.dcache.nfs.status.BadStateidException;
@@ -39,9 +29,16 @@ import org.dcache.nfs.v4.xdr.sessionid4;
 import org.dcache.nfs.v4.xdr.stateid4;
 import org.dcache.nfs.v4.xdr.verifier4;
 import org.dcache.utils.Bytes;
-import org.dcache.utils.Cache;
-import org.dcache.utils.CacheElement;
-import org.dcache.utils.NopCacheEventListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.net.InetSocketAddress;
+import java.security.Principal;
+import java.util.Collection;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Preconditions.checkState;
 
@@ -60,7 +57,7 @@ public class NFSv4StateHandler {
     private final AtomicInteger _clientId = new AtomicInteger(0);
 
     // mapping between server generated clietid and nfs_client_id, not confirmed yet
-    private final Cache<clientid4, NFS4Client> _clientsByServerId;
+    private final Map<clientid4, NFS4Client> _clientsByServerId;
 
     /**
      * Client's lease expiration time in milliseconds.
@@ -82,10 +79,7 @@ public class NFSv4StateHandler {
 
     NFSv4StateHandler(long leaseTime, int instanceId) {
         _leaseTime = TimeUnit.SECONDS.toMillis(leaseTime);
-        _clientsByServerId = new Cache<>("NFSv41 clients", 5000, Long.MAX_VALUE,
-                _leaseTime * 2,
-                new DeadClientCollector(),
-                _leaseTime * 4, TimeUnit.MILLISECONDS);
+        _clientsByServerId = new ConcurrentHashMap<>();
 
         _running = true;
         _instanceId = instanceId;
@@ -140,9 +134,8 @@ public class NFSv4StateHandler {
     }
 
     public synchronized NFS4Client clientByOwner(byte[] ownerid) {
-        return _clientsByServerId.entries()
+        return _clientsByServerId.values()
                 .stream()
-                .map(CacheElement::getObject)
                 .filter(c -> c.isOwner(ownerid))
                 .findAny()
                 .orElse(null);
@@ -162,11 +155,9 @@ public class NFSv4StateHandler {
         client.updateLeaseTime();
     }
 
-    public synchronized List<NFS4Client> getClients() {
+    public synchronized Collection<NFS4Client> getClients() {
         checkState(_running, "NFS state handler not running");
-        return _clientsByServerId.entries().stream()
-                .map(CacheElement::getObject)
-                .collect(Collectors.toList());
+        return _clientsByServerId.values();
     }
 
     public NFS4Client createClient(InetSocketAddress clientAddress, InetSocketAddress localAddress, int minorVersion,
@@ -184,15 +175,6 @@ public class NFSv4StateHandler {
         return _openFileTracker;
     }
 
-    private class DeadClientCollector extends NopCacheEventListener<clientid4, NFS4Client> {
-
-        @Override
-        public void notifyExpired(Cache<clientid4, NFS4Client> cache, NFS4Client client) {
-            _log.info("Removing expired client: {}", client);
-            client.tryDispose();
-        }
-    }
-
     /**
      * Check is the GRACE period expired.
      * @return true, if grace period expired.
@@ -208,8 +190,7 @@ public class NFSv4StateHandler {
     }
 
     private synchronized void drainClients() {
-        _clientsByServerId.entries().stream()
-                .map(CacheElement::getObject)
+        _clientsByServerId.values()
                 .forEach(c -> {
                     c.tryDispose();
                     _clientsByServerId.remove(c.getId());
@@ -223,7 +204,6 @@ public class NFSv4StateHandler {
         checkState(_running, "NFS state handler not running");
         _running = false;
         drainClients();
-        _clientsByServerId.shutdown();
     }
 
     /**
