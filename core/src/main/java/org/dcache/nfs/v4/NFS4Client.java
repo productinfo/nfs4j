@@ -466,7 +466,6 @@ public class NFS4Client {
     }
 
     private void drainStates() {
-        Collection<NFS4State> states = new ArrayList<>(_clientStates.size());
         Iterator<NFS4State> i = _clientStates.values().iterator();
         while (i.hasNext()) {
             NFS4State state = i.next();
