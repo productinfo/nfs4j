@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2016 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2017 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -21,10 +21,11 @@ package org.dcache.nfs.vfs;
 
 import com.google.common.base.Function;
 import com.google.common.base.Splitter;
-import com.google.common.collect.Lists;
+import com.google.common.collect.Collections2;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -183,11 +184,12 @@ public class PseudoFs extends ForwardingFileSystem {
     }
 
     @Override
-    public List<DirectoryEntry> list(Inode inode) throws IOException {
+    public DirectoryStream list(Inode inode, byte[] verifier, long cookie) throws IOException {
         if (inode.isPesudoInode()) {
-            return listPseudoDirectory(inode);
+            return new DirectoryStream(listPseudoDirectory(inode));
         }
-        return Lists.transform(_inner.list(inode), new PushParentIndex(inode));
+        DirectoryStream innerStrem = _inner.list(inode, verifier, cookie);
+        return new DirectoryStream(innerStrem.getVerifier(), Collections2.transform(innerStrem.getEntries(), new PushParentIndex(inode)));
     }
 
     @Override
@@ -247,6 +249,11 @@ public class PseudoFs extends ForwardingFileSystem {
 
     @Override
     public void setattr(Inode inode, Stat stat) throws IOException {
+        int mask = ACE4_WRITE_ATTRIBUTES;
+        if (stat.isDefined(Stat.StatAttribute.OWNER)) {
+            mask |= ACE4_WRITE_OWNER;
+        }
+        checkAccess(inode, mask);
         _inner.setattr(inode, stat);
     }
 
@@ -405,7 +412,7 @@ public class PseudoFs extends ForwardingFileSystem {
         public DirectoryEntry apply(DirectoryEntry input) {
             return new DirectoryEntry(input.getName(),
                     pseudoIdToReal(input.getInode(), getIndexId(_node)),
-                    input.getStat());
+                    input.getStat(), input.getCookie());
         }
     }
 
@@ -420,17 +427,18 @@ public class PseudoFs extends ForwardingFileSystem {
         @Override
         public DirectoryEntry apply(DirectoryEntry input) {
             return new DirectoryEntry(input.getName(),
-                    pushExportIndex(_inode, input.getInode()), input.getStat());
+                    pushExportIndex(_inode, input.getInode()), input.getStat(), input.getCookie());
         }
     }
 
-    private List<DirectoryEntry> listPseudoDirectory(Inode parent) throws ChimeraNFSException, IOException {
+    private Collection<DirectoryEntry> listPseudoDirectory(Inode parent) throws ChimeraNFSException, IOException {
         Set<PseudoFsNode> nodes = prepareExportTree();
         for (PseudoFsNode node : nodes) {
             if (node.id().equals(parent)) {
                 if (node.isMountPoint()) {
-                    return Lists.transform(_inner.list(parent), new ConvertToRealInode(node));
+                    return Collections2.transform(_inner.list(parent, null, 0L).getEntries(), new ConvertToRealInode(node));
                 } else {
+                    long cookie = 0; // artificial cookie
                     List<DirectoryEntry> pseudoLs = new ArrayList<>();
                     for (String s : node.getChildren()) {
                         PseudoFsNode subNode = node.getChild(s);
@@ -438,8 +446,9 @@ public class PseudoFs extends ForwardingFileSystem {
                         Stat stat = _inner.getattr(inode);
                         DirectoryEntry e = new DirectoryEntry(s,
                                 subNode.isMountPoint()
-                                ? pseudoIdToReal(inode, getIndexId(subNode)) : inode, stat);
+                                ? pseudoIdToReal(inode, getIndexId(subNode)) : inode, stat, cookie);
                         pseudoLs.add(e);
+                        cookie++;
                     }
                     return pseudoLs;
                 }
