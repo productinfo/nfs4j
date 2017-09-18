@@ -19,18 +19,18 @@
  */
 package org.dcache.nfs.vfs;
 
+import java.io.IOException;
+import java.util.List;
+import javax.security.auth.Subject;
 import org.dcache.nfs.v4.NfsIdMapping;
 import org.dcache.nfs.v4.xdr.nfsace4;
 import org.dcache.nfs.v4.xdr.stable_how4;
-
-import java.io.IOException;
-import java.util.List;
 
 public interface VirtualFileSystem {
 
     int access(Inode inode, int mode) throws IOException;
 
-    Inode create(Inode parent, Stat.Type type, String path, int mode) throws IOException;
+    Inode create(Inode parent, Stat.Type type, String path, Subject subject, int mode) throws IOException;
 
     FsStat getFsStat() throws IOException;
 
@@ -38,11 +38,11 @@ public interface VirtualFileSystem {
 
     Inode lookup(Inode parent, String path) throws IOException;
 
-    Inode link(Inode parent, Inode link, String path) throws IOException;
+    Inode link(Inode parent, Inode link, String path, Subject subject) throws IOException;
 
     List<DirectoryEntry> list(Inode inode) throws IOException;
 
-    Inode mkdir(Inode parent, String path, int mode) throws IOException;
+    Inode mkdir(Inode parent, String path, Subject subject, int mode) throws IOException;
 
     boolean move(Inode src, String oldName, Inode dest, String newName) throws IOException;
 
@@ -54,7 +54,7 @@ public interface VirtualFileSystem {
 
     void remove(Inode parent, String path) throws IOException;
 
-    Inode symlink(Inode parent, String path, String link, int mode) throws IOException;
+    Inode symlink(Inode parent, String path, String link, Subject subject, int mode) throws IOException;
 
     WriteResult write(Inode inode, byte[] data, long offset, int count, StabilityLevel stabilityLevel) throws IOException;
 
@@ -97,7 +97,7 @@ public interface VirtualFileSystem {
         UNSTABLE, DATA_SYNC, FILE_SYNC;
 
         public static StabilityLevel fromStableHow(int stableHowValue) {
-            switch(stableHowValue) {
+            switch (stableHowValue) {
                 case stable_how4.UNSTABLE4:
                     return UNSTABLE;
                 case stable_how4.DATA_SYNC4:
@@ -105,7 +105,7 @@ public interface VirtualFileSystem {
                 case stable_how4.FILE_SYNC4:
                     return FILE_SYNC;
                 default:
-                    throw new IllegalArgumentException("unhandled stability value " + stableHowValue);
+                    throw new IllegalArgumentException("unhandled stability value "+stableHowValue);
             }
         }
 

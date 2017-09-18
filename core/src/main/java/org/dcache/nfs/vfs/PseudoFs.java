@@ -140,8 +140,8 @@ public class PseudoFs extends ForwardingFileSystem {
     }
 
     @Override
-    public Inode create(Inode parent, Stat.Type type, String path, int mode) throws IOException {
-        return pushExportIndex(parent, _inner.create(parent, type, path, mode));
+    public Inode create(Inode parent, Stat.Type type, String path, Subject subject, int mode) throws IOException {
+        return pushExportIndex(parent, _inner.create(parent, type, path, subject, mode));
     }
 
     @Override
@@ -178,8 +178,8 @@ public class PseudoFs extends ForwardingFileSystem {
     }
 
     @Override
-    public Inode link(Inode parent, Inode link, String path) throws IOException {
-        return pushExportIndex(parent, _inner.link(parent, link, path));
+    public Inode link(Inode parent, Inode link, String path, Subject subject) throws IOException {
+        return pushExportIndex(parent, _inner.link(parent, link, path, subject));
     }
 
     @Override
@@ -191,8 +191,8 @@ public class PseudoFs extends ForwardingFileSystem {
     }
 
     @Override
-    public Inode mkdir(Inode parent, String path, int mode) throws IOException {
-        return pushExportIndex(parent, _inner.mkdir(parent, path, mode));
+    public Inode mkdir(Inode parent, String path, Subject subject, int mode) throws IOException {
+        return pushExportIndex(parent, _inner.mkdir(parent, path, subject, mode));
     }
 
     @Override
@@ -231,8 +231,8 @@ public class PseudoFs extends ForwardingFileSystem {
     }
 
     @Override
-    public Inode symlink(Inode parent, String path, String link, int mode) throws IOException {
-        return pushExportIndex(parent, _inner.symlink(parent, path, link, mode));
+    public Inode symlink(Inode parent, String path, String link, Subject subject, int mode) throws IOException {
+        return pushExportIndex(parent, _inner.symlink(parent, path, link, subject, mode));
     }
 
     @Override

@@ -19,11 +19,11 @@
  */
 package org.dcache.nfs.vfs;
 
-import org.dcache.nfs.v4.NfsIdMapping;
-import org.dcache.nfs.v4.xdr.nfsace4;
-
 import java.io.IOException;
 import java.util.List;
+import javax.security.auth.Subject;
+import org.dcache.nfs.v4.NfsIdMapping;
+import org.dcache.nfs.v4.xdr.nfsace4;
 
 /**
  * A file system which forwards all its method calls to another file system.
@@ -47,8 +47,8 @@ public abstract class ForwardingFileSystem implements VirtualFileSystem {
     }
 
     @Override
-    public Inode create(Inode parent, Stat.Type type, String path, int mode) throws IOException {
-        return delegate().create(parent, type, path, mode);
+    public Inode create(Inode parent, Stat.Type type, String path, Subject subject, int mode) throws IOException {
+        return delegate().create(parent, type, path, subject, mode);
     }
 
     @Override
@@ -67,8 +67,8 @@ public abstract class ForwardingFileSystem implements VirtualFileSystem {
     }
 
     @Override
-    public Inode link(Inode parent, Inode link, String path) throws IOException {
-        return delegate().link(parent, link, path);
+    public Inode link(Inode parent, Inode link, String path, Subject subject) throws IOException {
+        return delegate().link(parent, link, path, subject);
     }
 
     @Override
@@ -77,8 +77,8 @@ public abstract class ForwardingFileSystem implements VirtualFileSystem {
     }
 
     @Override
-    public Inode mkdir(Inode parent, String path, int mode) throws IOException {
-        return delegate().mkdir(parent, path, mode);
+    public Inode mkdir(Inode parent, String path, Subject subject, int mode) throws IOException {
+        return delegate().mkdir(parent, path, subject, mode);
     }
 
     @Override
@@ -107,8 +107,8 @@ public abstract class ForwardingFileSystem implements VirtualFileSystem {
     }
 
     @Override
-    public Inode symlink(Inode parent, String path, String link, int mode) throws IOException {
-        return delegate().symlink(parent, path, link, mode);
+    public Inode symlink(Inode parent, String path, String link, Subject subject, int mode) throws IOException {
+        return delegate().symlink(parent, path, link, subject, mode);
     }
 
     @Override
