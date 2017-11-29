@@ -120,9 +120,6 @@ public class NFS4Client {
 
     private final Map<stateid4, NFS4State> _clientStates = new ConcurrentHashMap<>();
 
-    // FIXME: the max stateids have to be controlled by session
-    private final int MAX_OPEN_STATES = 16384;
-
     /**
      * sessions associated with the client
      */
@@ -298,10 +295,6 @@ public class NFS4Client {
     }
 
     public NFS4State createState(StateOwner stateOwner, NFS4State openState) throws ChimeraNFSException {
-
-        if (_clientStates.size() >= MAX_OPEN_STATES) {
-            throw new ResourceException("Too many states.");
-        }
 
         NFS4State state = new NFS4State(openState, stateOwner, _stateHandler.createStateId(this, _stateIdCounter.incrementAndGet()));
         if (openState != null) {
