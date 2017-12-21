@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosPrincipal;
@@ -41,6 +42,7 @@ import org.dcache.nfs.v4.nlm.LockManager;
 import org.dcache.nfs.v4.xdr.server_owner4;
 import org.dcache.nfs.v4.xdr.stateid4;
 import org.dcache.nfs.v4.xdr.uint64_t;
+import org.dcache.nfs.v4.xdr.verifier4;
 import org.dcache.nfs.vfs.VirtualFileSystem;
 import org.dcache.utils.net.InetSocketAddresses;
 import org.dcache.xdr.RpcAuthType;
@@ -84,7 +86,7 @@ public class CompoundContext {
     private final RpcCall _callInfo;
     private final Subject _subject;
     private final ExportFile _exportFile;
-    private final NFSv41DeviceManager _deviceManager;
+    private final Optional<NFSv41DeviceManager> _deviceManager;
     private final NFSv4StateHandler _stateHandler;
     private SessionSlot _slot;
     private boolean _cacheThis;
@@ -92,6 +94,8 @@ public class CompoundContext {
     private stateid4 _savedStateid = null;
     private final Principal _principal;
     private final LockManager _nlm;
+    private final int _exchangeIdFlags;
+    private final verifier4 _rebootVerifier;
 
     /**
      * Create context of COUMPOUND request.
@@ -101,7 +105,7 @@ public class CompoundContext {
     public CompoundContext(CompoundContextBuilder builder) {
         _minorversion = builder.getMinorversion();
         _fs = builder.getFs();
-        _deviceManager = builder.getDeviceManager();
+        _deviceManager = Optional.ofNullable(builder.getDeviceManager());
         _callInfo = builder.getCall();
         _exportFile = builder.getExportFile();
         _stateHandler = builder.getStateHandler();
@@ -109,6 +113,8 @@ public class CompoundContext {
 
         _subject = _callInfo.getCredential().getSubject();
         _principal = principalOf(_callInfo);
+        _exchangeIdFlags = builder.getExchangeIdFlags();
+        _rebootVerifier = builder.getRebootVerifier();
     }
 
     public RpcCall getRpcCall() {
@@ -123,7 +129,7 @@ public class CompoundContext {
         return _fs;
     }
 
-    public NFSv41DeviceManager getDeviceManager() {
+    public Optional<NFSv41DeviceManager> getDeviceManager() {
         return _deviceManager;
     }
 
@@ -315,6 +321,10 @@ public class CompoundContext {
         return _principal;
     }
 
+    public int getExchangeIdFlags() {
+        return _exchangeIdFlags;
+    }
+
     private Principal principalOf(final RpcCall call) {
 
         Class<? extends Principal> type;
@@ -344,5 +354,13 @@ public class CompoundContext {
      */
     public InetSocketAddress getLocalSocketAddress() {
         return getRpcCall().getTransport().getLocalSocketAddress();
+    }
+
+    /**
+     * Return verifier to indicate server reboot.
+     * @return reboot verifier.
+     */
+    public verifier4 getRebootVerifier() {
+        return _rebootVerifier;
     }
 }

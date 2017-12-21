@@ -59,6 +59,7 @@ import org.dcache.nfs.status.StaleStateidException;
 import org.dcache.nfs.status.TooManyOpsException;
 import org.dcache.nfs.v4.nlm.LockManager;
 import org.dcache.nfs.v4.nlm.SimpleLm;
+import org.dcache.nfs.v4.xdr.verifier4;
 
 public class NFSServerV41 extends nfs4_prot_NFS4_PROGRAM_ServerStub {
 
@@ -73,6 +74,11 @@ public class NFSServerV41 extends nfs4_prot_NFS4_PROGRAM_ServerStub {
     private final NFSv41DeviceManager _deviceManager;
     private final NFSv4StateHandler _statHandler;
     private final LockManager _nlm;
+    /**
+     * Verifier to indicate client that server is rebooted. Current currentTimeMillis
+     * is good enough, unless server reboots within a millisecond.
+     */
+    private final verifier4 _rebootVerifier = verifier4.valueOf(System.currentTimeMillis());
 
     private NFSServerV41(Builder builder) {
         _deviceManager = builder.deviceManager;
@@ -137,15 +143,27 @@ public class NFSServerV41 extends nfs4_prot_NFS4_PROGRAM_ServerStub {
 
             VirtualFileSystem fs = new PseudoFs(_fs, call$, _exportFile);
 
-            CompoundContext context = new CompoundContextBuilder()
+            CompoundContextBuilder builder = new CompoundContextBuilder()
                     .withMinorversion(arg1.minorversion.value)
                     .withFs(fs)
                     .withDeviceManager(_deviceManager)
                     .withStateHandler(_statHandler)
                     .withLockManager(_nlm)
                     .withExportFile(_exportFile)
-                    .withCall(call$)
-                    .build();
+                    .withRebootVerifier(_rebootVerifier)
+                    .withCall(call$);
+
+            if (_deviceManager != null) {
+                builder.withPnfsRoleMDS();
+                // we do proxy-io
+                builder.withPnfsRoleDS();
+            } else if (_exportFile == null) {
+                builder.withPnfsRoleDS();
+            } else {
+                builder.withoutPnfs();
+            }
+
+            CompoundContext context = builder.build();
 
             boolean retransmit = false;
             for (int position = 0; position <arg1.argarray.length; position++) {
