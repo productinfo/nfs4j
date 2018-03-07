@@ -34,7 +34,6 @@ import org.dcache.auth.Subjects;
 import org.dcache.nfs.ChimeraNFSException;
 import org.dcache.nfs.ExportFile;
 import org.dcache.nfs.FsExport;
-import org.dcache.nfs.nfsstat;
 import org.dcache.nfs.status.*;
 import org.dcache.nfs.v4.acl.Acls;
 import org.dcache.nfs.v4.xdr.acemask4;
@@ -84,7 +83,7 @@ public class PseudoFs extends ForwardingFileSystem {
         return _inner;
     }
 
-    private boolean canAccess(Inode inode, int mode) {
+    private boolean canAccess(Inode inode, Stat stat, int mode) {
         try {
             checkAccess(inode, mode);
             return true;
@@ -101,38 +100,39 @@ public class PseudoFs extends ForwardingFileSystem {
             throw new InvalException("invalid access mask");
         }
 
+        Stat stat = _inner.getattr(inode);
         if ((mode & ACCESS4_READ) != 0) {
-            if (canAccess(inode, ACE4_READ_DATA)) {
+            if (canAccess(inode, stat, ACE4_READ_DATA)) {
                 accessmask |= ACCESS4_READ;
             }
         }
 
         if ((mode & ACCESS4_LOOKUP) != 0) {
-            if (canAccess(inode, ACE4_EXECUTE)) {
+            if (canAccess(inode, stat, ACE4_EXECUTE)) {
                 accessmask |= ACCESS4_LOOKUP;
             }
         }
 
         if ((mode & ACCESS4_MODIFY) != 0) {
-            if (canAccess(inode, ACE4_WRITE_DATA)) {
+            if (canAccess(inode, stat, ACE4_WRITE_DATA)) {
                 accessmask |= ACCESS4_MODIFY;
             }
         }
 
         if ((mode & ACCESS4_EXECUTE) != 0) {
-            if (canAccess(inode, ACE4_EXECUTE)) {
+            if (canAccess(inode, stat, ACE4_EXECUTE)) {
                 accessmask |= ACCESS4_EXECUTE;
             }
         }
 
         if ((mode & ACCESS4_EXTEND) != 0) {
-            if (canAccess(inode, ACE4_APPEND_DATA)) {
+            if (canAccess(inode, stat, ACE4_APPEND_DATA)) {
                 accessmask |= ACCESS4_EXTEND;
             }
         }
 
         if ((mode & ACCESS4_DELETE) != 0) {
-            if (canAccess(inode, ACE4_DELETE_CHILD)) {
+            if (canAccess(inode, stat, ACE4_DELETE_CHILD)) {
                 accessmask |= ACCESS4_DELETE;
             }
         }
@@ -308,6 +308,10 @@ public class PseudoFs extends ForwardingFileSystem {
 
 
     private void checkAccess(Inode inode, int requestedMask) throws IOException {
+        this.checkAccess(inode, _inner.getattr(inode), requestedMask);
+    }
+
+    private void checkAccess(Inode inode, Stat stat, int requestedMask) throws IOException {
         final Subject effectiveSubject = this.getSubject(inode, requestedMask);
 
         Access aclMatched = Access.UNDEFINED;
@@ -329,7 +333,6 @@ public class PseudoFs extends ForwardingFileSystem {
          * always allows it.
          */
         if ((aclMatched == Access.UNDEFINED) && (requestedMask != ACE4_READ_ATTRIBUTES)) {
-            Stat stat = _inner.getattr(inode);
             int unixAccessmask = unixToAccessmask(effectiveSubject, stat);
             if ((unixAccessmask & requestedMask) != requestedMask) {
                 _log.warn("Access denied: {} {} {} {} {}", inode, _inetAddress,
