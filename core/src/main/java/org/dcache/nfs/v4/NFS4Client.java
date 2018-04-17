@@ -311,6 +311,7 @@ public class NFS4Client {
         NFS4State state = _clientStates.get(stateid);
         if (state == null) {
             _log.warn("Ignore unknown client state: " + stateid);
+            return;
         }
         state.disposeIgnoreFailures();
         _clientStates.remove(stateid);
@@ -321,6 +322,7 @@ public class NFS4Client {
         NFS4State state = _clientStates.get(stateid);
         if (state == null) {
             _log.warn("Ignore unknown client state: " + stateid);
+            return;
         }
         state.tryDispose();
         _clientStates.remove(stateid);
