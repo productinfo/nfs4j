@@ -165,6 +165,11 @@ public class NFSv4StateHandler {
         clientid4 clientId = new clientid4(Bytes.getLong(stateId.other, 0));
         NFS4Client client = _clientsByServerId.get(clientId);
         if (client == null) {
+            if (_clientsByServerId.size() > 0){
+                final NFS4Client s = _clientsByServerId.values().iterator().next();
+                _log.warn("Unknown client " + clientId + " returning " + s.getId());
+                return s;
+            }
             throw new BadStateidException("no client for stateid: " + stateId);
         }
         return client;
