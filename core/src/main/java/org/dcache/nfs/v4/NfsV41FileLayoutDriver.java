@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2017 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2018 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -36,11 +36,11 @@ import org.dcache.nfs.v4.xdr.nfsv4_1_file_layout_ds_addr4;
 import org.dcache.nfs.v4.xdr.offset4;
 import org.dcache.nfs.v4.xdr.stateid4;
 import org.dcache.nfs.v4.xdr.uint32_t;
-import org.dcache.xdr.OncRpcException;
-import org.dcache.xdr.XdrBuffer;
-import org.glassfish.grizzly.Buffer;
+import org.dcache.oncrpc4j.rpc.OncRpcException;
+import org.dcache.oncrpc4j.xdr.Xdr;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import org.dcache.nfs.status.BadXdrException;
 /**
  * layout driver for NFSv4.1 file layout type as defined in
  * <a href="https://www.ietf.org/rfc/rfc5661.txt">rfc5661</a>
@@ -68,11 +68,12 @@ public class NfsV41FileLayoutDriver implements LayoutDriver {
         file_type.nflda_stripe_indices = new uint32_t[1];
         file_type.nflda_stripe_indices[0] = new uint32_t(0);
 
-        XdrBuffer xdr = new XdrBuffer(128);
-        try {
+        byte[] retBytes;
+        try(Xdr xdr = new Xdr(128)){
             xdr.beginEncoding();
             file_type.xdrEncode(xdr);
             xdr.endEncoding();
+            retBytes = xdr.getBytes();
         } catch (OncRpcException e) {
             /* forced by interface, should never happen. */
             throw new RuntimeException("Unexpected OncRpcException:", e);
@@ -80,10 +81,6 @@ public class NfsV41FileLayoutDriver implements LayoutDriver {
             /* forced by interface, should never happen. */
             throw new RuntimeException("Unexpected IOException:", e);
         }
-
-        Buffer body = xdr.asBuffer();
-        byte[] retBytes = new byte[body.remaining()];
-        body.get(retBytes);
 
         device_addr4 addr = new device_addr4();
         addr.da_layout_type = layouttype4.LAYOUT4_NFSV4_1_FILES.getValue();
@@ -125,19 +122,15 @@ public class NfsV41FileLayoutDriver implements LayoutDriver {
         //where the striping pattern starts
         layout.nfl_pattern_offset = new offset4(0);
 
-        XdrBuffer xdr = new XdrBuffer(512);
-        xdr.beginEncoding();
-
-        try {
+        byte[] body;
+        try (Xdr xdr = new Xdr(512)) {
+            xdr.beginEncoding();
             layout.xdrEncode(xdr);
+            xdr.endEncoding();
+            body = xdr.getBytes();
         } catch (IOException e) {
             throw new ServerFaultException("failed to encode layout body");
         }
-        xdr.endEncoding();
-
-        Buffer xdrBody = xdr.asBuffer();
-        byte[] body = new byte[xdrBody.remaining()];
-        xdrBody.get(body);
 
         layout_content4 content = new layout_content4();
         content.loc_type = layouttype4.LAYOUT4_NFSV4_1_FILES.getValue();
@@ -146,4 +139,19 @@ public class NfsV41FileLayoutDriver implements LayoutDriver {
         return content;
     }
 
+    /**
+     * Returns consumer which accepts data provided on layout return.
+     * @throws org.dcache.nfs.status.BadXdrException
+     */
+    @Override
+    public void acceptLayoutReturnData(byte[] data) throws BadXdrException {
+
+        /*
+         * NFSv41 file layout driver doesn't expect any data on return.
+         */
+        if (data.length != 0) {
+            throw new BadXdrException("Unexpected data on layout return");
+        }
+
+    }
 }

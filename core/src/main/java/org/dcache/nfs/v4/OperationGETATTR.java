@@ -86,8 +86,8 @@ import org.dcache.nfs.v4.xdr.layouttype4;
 import org.dcache.nfs.v4.xdr.GETATTR4resok;
 import org.dcache.nfs.v4.xdr.GETATTR4res;
 
-import org.dcache.xdr.XdrAble;
-import org.dcache.xdr.XdrBuffer;
+import org.dcache.oncrpc4j.xdr.XdrAble;
+import org.dcache.oncrpc4j.xdr.Xdr;
 import org.dcache.nfs.status.InvalException;
 import org.dcache.nfs.v4.xdr.fattr4_space_avail;
 import org.dcache.nfs.v4.xdr.fattr4_time_delta;
@@ -97,8 +97,7 @@ import org.dcache.nfs.vfs.FsStat;
 import org.dcache.nfs.vfs.Inode;
 import org.dcache.nfs.vfs.VirtualFileSystem;
 import org.dcache.nfs.vfs.Stat;
-import org.dcache.xdr.OncRpcException;
-import org.glassfish.grizzly.Buffer;
+import org.dcache.oncrpc4j.rpc.OncRpcException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -136,25 +135,25 @@ public class OperationGETATTR extends AbstractNFSv4Operation {
          */
         bitmap4 processedAttributes = new bitmap4(new int[0]);
 
-        XdrBuffer xdr = new XdrBuffer(1024);
-        xdr.beginEncoding();
+        byte[] retBytes;
+        try (Xdr xdr = new Xdr(1024)) {
+            xdr.beginEncoding();
 
-        for (int i : bitmap) {
-            Optional<XdrAble> optionalAttr = (Optional<XdrAble>) fattr2xdr(i, fs, inode, stat, context);
-            if (optionalAttr.isPresent()) {
-                XdrAble attr = optionalAttr.get();
-                _log.debug("   getAttributes : {} ({}) OK.", i, attrMask2String(i));
-                attr.xdrEncode(xdr);
-                processedAttributes.set(i);
-            } else {
-                _log.debug("   getAttributes : {} ({}) NOT SUPPORTED.", i, attrMask2String(i));
+            for (int i : bitmap) {
+                Optional<XdrAble> optionalAttr = (Optional<XdrAble>) fattr2xdr(i, fs, inode, stat, context);
+                if (optionalAttr.isPresent()) {
+                    XdrAble attr = optionalAttr.get();
+                    _log.debug("   getAttributes : {} ({}) OK.", i, attrMask2String(i));
+                    attr.xdrEncode(xdr);
+                    processedAttributes.set(i);
+                } else {
+                    _log.debug("   getAttributes : {} ({}) NOT SUPPORTED.", i, attrMask2String(i));
+                }
             }
-        }
 
-        xdr.endEncoding();
-        Buffer body = xdr.asBuffer();
-        byte[] retBytes = new byte[body.remaining()] ;
-        body.get(retBytes);
+            xdr.endEncoding();
+            retBytes = xdr.getBytes();
+        }
 
         fattr4 attributes = new fattr4();
         attributes.attrmask = processedAttributes;
@@ -187,7 +186,7 @@ public class OperationGETATTR extends AbstractNFSv4Operation {
      */
 
     // read/read-write
-    private static Optional<? extends XdrAble> fattr2xdr(int fattr, VirtualFileSystem fs, Inode inode, Stat stat, CompoundContext context) throws IOException {
+    static Optional<? extends XdrAble> fattr2xdr(int fattr, VirtualFileSystem fs, Inode inode, Stat stat, CompoundContext context) throws IOException {
 
         FsStat fsStat = null;
 
@@ -395,9 +394,8 @@ public class OperationGETATTR extends AbstractNFSv4Operation {
 		Set<layouttype4> supportedLayouts = pnfsDeviceManager.get().getLayoutTypes();
 
                 if (exportLayouts.isEmpty()) {
-                    fs_layout_type.value = supportedLayouts.stream()
-                        .mapToInt(layouttype4::getValue)
-                        .toArray();
+                    // for backward compatibility, pick NFSv41_FILES layout if nothing is specified
+                    fs_layout_type.value = new int[] {layouttype4.LAYOUT4_NFSV4_1_FILES.getValue()};
                 } else {
                     fs_layout_type.value = exportLayouts.stream()
                         .filter(e -> supportedLayouts.contains(e))

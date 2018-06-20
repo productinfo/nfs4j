@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2017 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2018 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -18,10 +18,15 @@
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 package org.dcache.nfs.v4.xdr;
-import org.dcache.xdr.*;
+
+import com.google.common.io.BaseEncoding;
+import org.dcache.oncrpc4j.rpc.OncRpcException;
+import org.dcache.oncrpc4j.util.Bytes;
+import org.dcache.oncrpc4j.xdr.XdrAble;
+import org.dcache.oncrpc4j.xdr.XdrDecodingStream;
+import org.dcache.oncrpc4j.xdr.XdrEncodingStream;
 import java.io.IOException;
 import java.util.Arrays;
-import org.dcache.utils.Bytes;
 
 public class verifier4 implements XdrAble {
 
@@ -69,7 +74,7 @@ public class verifier4 implements XdrAble {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append('[').append(Bytes.toHexString(value)).append(']');
+        sb.append('[').append(BaseEncoding.base16().lowerCase().encode(value)).append(']');
         return sb.toString();
     }
 

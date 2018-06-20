@@ -23,6 +23,7 @@ import java.io.IOException;
 import org.dcache.nfs.ChimeraNFSException;
 import org.dcache.nfs.nfsstat;
 import org.dcache.nfs.v4.xdr.COMMIT4res;
+import org.dcache.nfs.v4.xdr.COMMIT4resok;
 import org.dcache.nfs.v4.xdr.nfs_argop4;
 import org.dcache.nfs.v4.xdr.nfs_opnum4;
 import org.dcache.nfs.v4.xdr.nfs_resop4;
@@ -40,8 +41,10 @@ public class OperationCOMMIT extends AbstractNFSv4Operation {
         final COMMIT4res res =  result.opcommit;
         Inode inode = context.currentInode();
 
+        _args.opcommit.offset.checkOverflow(_args.opcommit.count.value, "offset + length overflow");
         context.getFs().commit(inode, _args.opcommit.offset.value, _args.opcommit.count.value);
 
+        res.resok4 = new COMMIT4resok();
         res.resok4.writeverf = context.getRebootVerifier();
         result.opcommit.status = nfsstat.NFS_OK;
     }

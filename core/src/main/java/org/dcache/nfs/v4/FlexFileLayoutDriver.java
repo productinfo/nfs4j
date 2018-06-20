@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 -2018 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2016 - 2018 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -21,12 +21,15 @@ package org.dcache.nfs.v4;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.function.Consumer;
 import org.dcache.nfs.ChimeraNFSException;
+import org.dcache.nfs.status.BadXdrException;
 import org.dcache.nfs.status.ServerFaultException;
 import org.dcache.nfs.v4.ff.ff_data_server4;
 import org.dcache.nfs.v4.ff.ff_device_addr4;
 import org.dcache.nfs.v4.ff.ff_device_versions4;
 import org.dcache.nfs.v4.ff.ff_layout4;
+import org.dcache.nfs.v4.ff.ff_layoutreturn4;
 import org.dcache.nfs.v4.ff.ff_mirror4;
 import org.dcache.nfs.v4.ff.flex_files_prot;
 import org.dcache.nfs.v4.xdr.device_addr4;
@@ -42,9 +45,8 @@ import org.dcache.nfs.v4.xdr.nfs_fh4;
 import org.dcache.nfs.v4.xdr.stateid4;
 import org.dcache.nfs.v4.xdr.uint32_t;
 import org.dcache.nfs.v4.xdr.utf8str_mixed;
-import org.dcache.xdr.OncRpcException;
-import org.dcache.xdr.XdrBuffer;
-import org.glassfish.grizzly.Buffer;
+import org.dcache.oncrpc4j.rpc.OncRpcException;
+import org.dcache.oncrpc4j.xdr.Xdr;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -73,6 +75,11 @@ public class FlexFileLayoutDriver implements LayoutDriver {
     private final fattr4_owner_group groupPrincipal;
 
     /**
+     * Consumer which accepts data provided on layout return.
+     */
+    private final Consumer<ff_layoutreturn4> layoutReturnConsumer;
+
+    /**
      * Create new FlexFile layout driver with. The @code nfsVersion} and
      * {@code nfsMinorVersion} represent the protocol to be used to access the
      * storage device. If client uses AUTH_SYS, then provided {@code userPrincipal}
@@ -82,12 +89,15 @@ public class FlexFileLayoutDriver implements LayoutDriver {
      * @param nfsMinorVersion nfs minor version to use.
      * @param userPrincipal user principal to be used by client
      * @param groupPrincipal group principal to be used by client
+     * @param layoutReturnConsumer consumer which accepts data provided on layout return.
      */
-    public FlexFileLayoutDriver(int nfsVersion, int nfsMinorVersion, utf8str_mixed userPrincipal, utf8str_mixed groupPrincipal) {
+    public FlexFileLayoutDriver(int nfsVersion, int nfsMinorVersion,
+            utf8str_mixed userPrincipal, utf8str_mixed groupPrincipal, Consumer<ff_layoutreturn4> layoutReturnConsumer) {
         this.nfsVersion = nfsVersion;
         this.nfsMinorVersion = nfsMinorVersion;
         this.userPrincipal = new fattr4_owner(userPrincipal);
         this.groupPrincipal = new fattr4_owner_group(groupPrincipal);
+        this.layoutReturnConsumer = layoutReturnConsumer;
     }
 
 
@@ -114,11 +124,12 @@ public class FlexFileLayoutDriver implements LayoutDriver {
             flexfile_type.ffda_netaddrs.value[i] = new netaddr4(deviceAddress[i]);
         }
 
-        XdrBuffer xdr = new XdrBuffer(128);
-        try {
+        byte[] retBytes;
+        try(Xdr xdr = new Xdr(128)) {
             xdr.beginEncoding();
             flexfile_type.xdrEncode(xdr);
             xdr.endEncoding();
+            retBytes = xdr.getBytes();
         } catch (OncRpcException e) {
             /* forced by interface, should never happen. */
             throw new RuntimeException("Unexpected OncRpcException:" + e.getMessage(), e);
@@ -126,10 +137,6 @@ public class FlexFileLayoutDriver implements LayoutDriver {
             /* forced by interface, should never happen. */
             throw new RuntimeException("Unexpected IOException:"  + e.getMessage(), e);
         }
-
-        Buffer body = xdr.asBuffer();
-        byte[] retBytes = new byte[body.remaining()];
-        body.get(retBytes);
 
         device_addr4 addr = new device_addr4();
         addr.da_layout_type = layouttype4.LAYOUT4_FLEX_FILES.getValue();
@@ -151,19 +158,15 @@ public class FlexFileLayoutDriver implements LayoutDriver {
                 | flex_files_prot.FF_FLAGS_NO_IO_THRU_MDS);
         layout.ffl_stats_collect_hint = new uint32_t(0);
 
-        XdrBuffer xdr = new XdrBuffer(512);
-        xdr.beginEncoding();
-
-        try {
+        byte[] body;
+        try (Xdr xdr = new Xdr(512)) {
+            xdr.beginEncoding();
             layout.xdrEncode(xdr);
+            xdr.endEncoding();
+            body = xdr.getBytes();
         } catch (IOException e) {
             throw new ServerFaultException("failed to encode layout body", e);
         }
-        xdr.endEncoding();
-
-        Buffer xdrBody = xdr.asBuffer();
-        byte[] body = new byte[xdrBody.remaining()];
-        xdrBody.get(body);
 
         layout_content4 content = new layout_content4();
         content.loc_type = layouttype4.LAYOUT4_FLEX_FILES.getValue();
@@ -193,4 +196,29 @@ public class FlexFileLayoutDriver implements LayoutDriver {
         return mirrors;
     }
 
+    /**
+     * Consumes flexfiles specific data provided on layout return. The
+     * must be xdr encoded ff_layoutreturn4 object.
+     *
+     * See: https://www.ietf.org/id/draft-ietf-nfsv4-flex-files-17.txt#9
+     * REVISIT: update when flexfilie rfc is released as recommended standard.
+     *
+     * @throws org.dcache.nfs.status.BadXdrException if provided data cant be decoded.
+     */
+    @Override
+    public void acceptLayoutReturnData(byte[] data) throws BadXdrException {
+        try {
+
+            ff_layoutreturn4 lr;
+            try (Xdr xdr = new Xdr(data)) {
+                xdr.beginDecoding();
+                lr = new ff_layoutreturn4(xdr);
+                xdr.endDecoding();
+            }
+
+            layoutReturnConsumer.accept(lr);
+        } catch (IOException e) {
+            throw new BadXdrException("invalid data", e);
+        }
+    }
 }

@@ -8,7 +8,7 @@
 
     <groupId>ch.iterate</groupId>
     <artifactId>nfs4j</artifactId>
-    <version>0.15.13-SNAPSHOT</version>
+    <version>0.18.0-SNAPSHOT</version>
     <name>Java based NFSv4.1 implementation</name>
     <packaging>pom</packaging>
 
@@ -109,60 +109,70 @@
         </plugins>
     </build>
 
-    <!--
-      EXTERNAL DEPENDENCIES
-    -->
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>jline</groupId>
-                <artifactId>jline</artifactId>
-                <version>2.12.1</version>
-            </dependency>
-            <dependency>
-                <groupId>junit</groupId>
-                <artifactId>junit</artifactId>
-                <version>4.11</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.mockito</groupId>
-                <artifactId>mockito-core</artifactId>
-                <version>1.9.5</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.slf4j</groupId>
-                <artifactId>slf4j-api</artifactId>
-                <version>1.7.10</version>
-            </dependency>
-            <dependency>
-                <groupId>org.slf4j</groupId>
-                <artifactId>log4j-over-slf4j</artifactId>
-                <version>1.7.10</version>
-            </dependency>
-            <dependency>
-                <groupId>ch.qos.logback</groupId>
-                <artifactId>logback-classic</artifactId>
-                <version>1.0.13</version>
-            </dependency>
-            <dependency>
-                <groupId>com.google.guava</groupId>
-                <artifactId>guava</artifactId>
-                <version>20.0</version>
-            </dependency>
-            <dependency>
-                <groupId>org.springframework</groupId>
-                <artifactId>spring-context</artifactId>
-                <version>4.0.3.RELEASE</version>
-            </dependency>
-            <dependency>
-                <groupId>org.dcache</groupId>
-                <artifactId>oncrpc4j-core</artifactId>
-                <version>2.7.0</version>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
+  <!--
+    EXTERNAL DEPENDENCIES
+  -->
+  <dependencyManagement>
+      <dependencies>
+          <dependency>
+              <groupId>jline</groupId>
+              <artifactId>jline</artifactId>
+              <version>2.14.5</version>
+          </dependency>
+          <dependency>
+              <groupId>junit</groupId>
+              <artifactId>junit</artifactId>
+              <version>4.12</version>
+              <scope>test</scope>
+          </dependency>
+          <dependency>
+              <groupId>org.mockito</groupId>
+              <artifactId>mockito-core</artifactId>
+              <version>1.9.5</version>
+              <scope>test</scope>
+          </dependency>
+          <dependency>
+              <groupId>org.slf4j</groupId>
+              <artifactId>slf4j-api</artifactId>
+              <version>1.7.25</version>
+          </dependency>
+          <dependency>
+              <groupId>org.slf4j</groupId>
+              <artifactId>log4j-over-slf4j</artifactId>
+              <version>1.7.25</version>
+          </dependency>
+          <dependency>
+              <groupId>ch.qos.logback</groupId>
+              <artifactId>logback-classic</artifactId>
+              <version>1.2.3</version>
+          </dependency>
+          <dependency>
+              <groupId>com.google.guava</groupId>
+              <artifactId>guava</artifactId>
+              <version>20.0</version>
+          </dependency>
+          <dependency>
+              <groupId>org.springframework</groupId>
+              <artifactId>spring-context</artifactId>
+              <version>4.0.3.RELEASE</version>
+          </dependency>
+          <dependency>
+              <groupId>org.dcache</groupId>
+              <artifactId>oncrpc4j-core</artifactId>
+              <version>3.0.1</version>
+          </dependency>
+          <dependency>
+              <groupId>com.hazelcast</groupId>
+              <artifactId>hazelcast</artifactId>
+              <version>3.9.2</version>
+          </dependency>
+          <dependency>
+              <groupId>com.hazelcast</groupId>
+              <artifactId>hazelcast-client</artifactId>
+              <version>3.9.2</version>
+          </dependency>
+      </dependencies>
+  </dependencyManagement>
 
     <!--
       MAVEN REPOSITORIES
