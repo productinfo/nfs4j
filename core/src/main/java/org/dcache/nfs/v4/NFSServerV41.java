@@ -21,6 +21,7 @@ package org.dcache.nfs.v4;
 
 import org.dcache.nfs.ChimeraNFSException;
 import org.dcache.nfs.ExportFile;
+import org.dcache.nfs.status.*;
 import org.dcache.nfs.v4.xdr.COMPOUND4args;
 import org.dcache.nfs.v4.xdr.COMPOUND4res;
 import org.dcache.nfs.v4.xdr.nfs4_prot_NFS4_PROGRAM_ServerStub;
@@ -40,23 +41,6 @@ import org.dcache.nfs.v4.xdr.nfs_opnum4;
 import org.dcache.nfs.vfs.PseudoFs;
 import org.dcache.nfs.vfs.VirtualFileSystem;
 import org.dcache.commons.stats.RequestExecutionTimeGauges;
-import org.dcache.nfs.status.BadSessionException;
-import org.dcache.nfs.status.BadStateidException;
-import org.dcache.nfs.status.BadXdrException;
-import org.dcache.nfs.status.ExpiredException;
-import org.dcache.nfs.status.InvalException;
-import org.dcache.nfs.status.MinorVersMismatchException;
-import org.dcache.nfs.status.NfsIoException;
-import org.dcache.nfs.status.NotOnlyOpException;
-import org.dcache.nfs.status.OpIllegalException;
-import org.dcache.nfs.status.OpNotInSessionException;
-import org.dcache.nfs.status.ResourceException;
-import org.dcache.nfs.status.RetryUncacheRepException;
-import org.dcache.nfs.status.SequencePosException;
-import org.dcache.nfs.status.ServerFaultException;
-import org.dcache.nfs.status.StaleClientidException;
-import org.dcache.nfs.status.StaleStateidException;
-import org.dcache.nfs.status.TooManyOpsException;
 import org.dcache.nfs.v4.nlm.LockManager;
 import org.dcache.nfs.v4.nlm.SimpleLm;
 import org.dcache.nfs.v4.xdr.verifier4;
@@ -213,7 +197,7 @@ public class NFSServerV41 extends nfs4_prot_NFS4_PROGRAM_ServerStub {
                 } catch (BadStateidException | StaleStateidException e) {
                     _log.warn("Bad Stateid: op: {} : {}", nfs_opnum4.toString(op.argop), e.getMessage());
                     opResult.setStatus(e.getStatus());
-                } catch (ExpiredException | BadSessionException | StaleClientidException  e) {
+                } catch (ExpiredException | BadSessionException | StaleClientidException | BadSeqidException e) {
                     _log.warn("Bad client: op: {} : {}", nfs_opnum4.toString(op.argop), e.getMessage());
                     opResult.setStatus(e.getStatus());
                 } catch (ChimeraNFSException e) {
