@@ -30,9 +30,12 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.security.Principal;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -181,10 +184,16 @@ public class NFSv4StateHandler {
         return client;
     }
 
+    /**
+     * Get existing, possibly not valid, client record that matches given client side generated long-hand owner identifier.
+     * @param ownerid client side generated long-hand owner identifier.
+     *
+     * @return an existing client record or null, if not matching record found.
+     */
     public synchronized NFS4Client clientByOwner(byte[] ownerid) {
         return _clientsByServerId.values()
                 .stream()
-                .filter(c -> c.isOwner(ownerid))
+                .filter(c -> Arrays.equals(c.getOwnerId(), ownerid))
                 .findAny()
                 .orElse(null);
     }
@@ -225,16 +234,16 @@ public class NFSv4StateHandler {
 
     /**
      * Check is the GRACE period expired.
-     * @return true, if grace period expired.
+     * @return true, if server in grace period.
      */
-    public boolean hasGracePeriodExpired() {
+    public boolean isGracePeriod() {
         checkState(_running, "NFS state handler not running");
 	/*
 	 * As we do not have a persistent storage for state information,
 	 * grace period makes no sense as it ends up as a simple delay
 	 * before first IO request can be processed.
 	 */
-	return true;
+        return false;
     }
 
     private synchronized void drainClients() {
