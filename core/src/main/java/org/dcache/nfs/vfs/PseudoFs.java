@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2017 Deutsches Elektronen-Synchroton,
+ * Copyright (c) 2009 - 2018 Deutsches Elektronen-Synchroton,
  * Member of the Helmholtz Association, (DESY), HAMBURG, GERMANY
  *
  * This library is free software; you can redistribute it and/or modify
@@ -19,9 +19,7 @@
  */
 package org.dcache.nfs.vfs;
 
-import com.google.common.base.Function;
 import com.google.common.base.Splitter;
-import com.google.common.collect.Collections2;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -29,6 +27,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 import javax.security.auth.Subject;
 import org.dcache.auth.Subjects;
 import org.dcache.nfs.ChimeraNFSException;
@@ -50,6 +49,7 @@ import org.dcache.oncrpc4j.rpc.gss.RpcGssService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.google.common.collect.Lists.newArrayList;
 import static org.dcache.nfs.vfs.AclCheckable.Access;
 /**
  * A decorated {@code VirtualFileSystem} that builds a Pseudo file system
@@ -189,7 +189,7 @@ public class PseudoFs extends ForwardingFileSystem {
             return new DirectoryStream(listPseudoDirectory(inode));
         }
         DirectoryStream innerStrem = _inner.list(inode, verifier, cookie);
-        return new DirectoryStream(innerStrem.getVerifier(), Collections2.transform(innerStrem.getEntries(), new PushParentIndex(inode)));
+        return innerStrem.transform(new PushParentIndex(inode));
     }
 
     @Override
@@ -251,7 +251,21 @@ public class PseudoFs extends ForwardingFileSystem {
     public void setattr(Inode inode, Stat stat) throws IOException {
         int mask = ACE4_WRITE_ATTRIBUTES;
         if (stat.isDefined(Stat.StatAttribute.OWNER)) {
-            mask |= ACE4_WRITE_OWNER;
+            /*
+             *
+             * According POSIX changing of owner_group for non privileged
+             * process if owner is equal to the file's user ID or (uid_t)-1.
+             * (See: http://pubs.opengroup.org/onlinepubs/9699919799/functions/chown.html)
+             *
+             * As we already enforce WRITE_ATTRIBUTES, e.g. file's owner matching subjects,
+             * remove required WRITE_OWNER only if new owner is different.
+             */
+            int currentOwner = getattr(inode).getUid();
+            if (currentOwner == stat.getUid() || stat.getUid() == -1) {
+                stat.undefine(Stat.StatAttribute.OWNER);
+            } else {
+                mask |= ACE4_WRITE_OWNER;
+            }
         }
         checkAccess(inode, mask);
         _inner.setattr(inode, stat);
@@ -439,7 +453,7 @@ public class PseudoFs extends ForwardingFileSystem {
         for (PseudoFsNode node : nodes) {
             if (node.id().equals(parent)) {
                 if (node.isMountPoint()) {
-                    return Collections2.transform(_inner.list(parent, null, 0L).getEntries(), new ConvertToRealInode(node));
+                    return newArrayList(_inner.list(parent, null, 0L).transform(new ConvertToRealInode(node)));
                 } else {
                     long cookie = 0; // artificial cookie
                     List<DirectoryEntry> pseudoLs = new ArrayList<>();
