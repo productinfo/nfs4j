@@ -28,7 +28,6 @@ import static org.junit.Assert.*;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import org.dcache.nfs.ChimeraNFSException;
-import org.dcache.nfs.status.BadSeqidException;
 import org.dcache.nfs.status.BadStateidException;
 import org.dcache.nfs.status.StaleClientidException;
 import org.dcache.nfs.v4.xdr.seqid4;
@@ -43,7 +42,7 @@ public class NFSv4StateHandlerTest {
     private StateOwner _owner;
 
     @Before
-    public void setUp() throws UnknownHostException, BadSeqidException {
+    public void setUp() throws UnknownHostException {
         _stateHandler = new NFSv4StateHandler();
         _client = createClient(_stateHandler);
         _owner =  _client.getOrCreateOwner("client test".getBytes(StandardCharsets.UTF_8), new seqid4(0));

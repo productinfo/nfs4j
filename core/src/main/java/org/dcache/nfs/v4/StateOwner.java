@@ -21,9 +21,10 @@ package org.dcache.nfs.v4;
 
 import com.google.common.base.MoreObjects;
 import java.io.Serializable;
-import org.dcache.nfs.status.BadSeqidException;
 import org.dcache.nfs.v4.xdr.seqid4;
 import org.dcache.nfs.v4.xdr.state_owner4;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Owner associated with the open/lock operations.
@@ -31,6 +32,8 @@ import org.dcache.nfs.v4.xdr.state_owner4;
 public class StateOwner implements Serializable {
 
     private static final long serialVersionUID = -4712959403595550903L;
+
+    private static final Logger _log = LoggerFactory.getLogger(StateOwner.class);
 
     /**
      * Per owner sequence to serialize opens with nfsv4.0
@@ -47,13 +50,13 @@ public class StateOwner implements Serializable {
         this.seq = seq;
     }
 
-    public synchronized void acceptAsNextSequence(seqid4 openSeqid) throws BadSeqidException {
-
+    public synchronized void acceptAsNextSequence(seqid4 openSeqid) {
         int next = seq + 1;
         if (next != openSeqid.value) {
-            throw new BadSeqidException();
+            _log.warn(String.format("bad sequence id %d. Expected %d", openSeqid.value, next));
+            // Assign regardless
         }
-        seq = next;
+        seq = openSeqid.value;
     }
 
     @Override

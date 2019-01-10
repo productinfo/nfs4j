@@ -37,7 +37,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.dcache.nfs.ChimeraNFSException;
-import org.dcache.nfs.status.BadSeqidException;
 import org.dcache.nfs.status.BadSessionException;
 import org.dcache.nfs.status.BadStateidException;
 import org.dcache.nfs.status.CompleteAlreadyException;
@@ -484,9 +483,8 @@ public class NFS4Client {
      * @param owner client unique state owner
      * @param seq open sequence to validate
      * @return state owner
-     * @throws BadSeqidException if sequence out of order.
      */
-    public synchronized StateOwner getOrCreateOwner(byte[] owner, seqid4 seq) throws BadSeqidException {
+    public synchronized StateOwner getOrCreateOwner(byte[] owner, seqid4 seq) {
         StateOwner stateOwner;
         if (_minorVersion == 0) {
             Opaque k = new Opaque(owner);
