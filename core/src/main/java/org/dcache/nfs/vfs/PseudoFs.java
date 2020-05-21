@@ -85,7 +85,7 @@ public class PseudoFs extends ForwardingFileSystem {
 
     private boolean canAccess(Inode inode, Stat stat, int mode) {
         try {
-            checkAccess(inode, mode);
+            checkAccess(inode, stat, mode);
             return true;
         } catch (IOException e) {
             return false;
